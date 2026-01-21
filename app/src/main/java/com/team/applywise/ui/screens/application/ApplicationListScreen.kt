@@ -185,7 +185,7 @@ fun ApplicationListItem(
     application: JobApplication,
     onClick: () -> Unit
 ) {
-    val dateFormat = remember { SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()) }
+    val dateFormat = remember { SimpleDateFormat("MMM dd, yyyy hh:mm a", Locale.getDefault()) }
 
     Card(
         modifier = Modifier
@@ -217,21 +217,16 @@ fun ApplicationListItem(
                 ApplicationStatusBadge(status = application.status)
             }
             Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = "Applied: ${dateFormat.format(Date(application.applicationDate))}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = "Updated: ${dateFormat.format(Date(application.updatedAt))}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            Text(
+                text = "Applied: ${dateFormat.format(Date(application.applicationDate))}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = "Updated: ${dateFormat.format(Date(application.updatedAt))}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

@@ -242,7 +242,7 @@ fun ApplicationItem(
     application: JobApplication,
     onClick: () -> Unit
 ) {
-    val dateFormat = remember { SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()) }
+    val dateFormat = remember { SimpleDateFormat("MMM dd, yyyy hh:mm a", Locale.getDefault()) }
 
     Card(
         modifier = Modifier

@@ -19,11 +19,11 @@ fun ApplicationStatusBadge(
 ) {
     val (backgroundColor, textColor) = when (status) {
         ApplicationStatus.APPLIED -> Color.Blue.copy(alpha = 0.15f) to Color.Blue
-        ApplicationStatus.INTERVIEW_SCHEDULED -> Color.Yellow.copy(alpha = 0.15f) to Color.Yellow
+        ApplicationStatus.INTERVIEW_SCHEDULED -> Color.Yellow.copy(alpha = 0.45f) to Color.Black
         ApplicationStatus.INTERVIEW_COMPLETED -> Color.Magenta.copy(alpha = 0.15f) to Color.Magenta
-        ApplicationStatus.OFFER_RECEIVED -> Color.Green.copy(alpha = 0.15f) to Color.Green
+        ApplicationStatus.OFFER_RECEIVED -> Color.Green.copy(alpha = 0.45f) to Color.White
         ApplicationStatus.REJECTED -> Color.Red.copy(alpha = 0.15f) to Color.Red
-        ApplicationStatus.NO_RESPONSE -> Color.Gray.copy(alpha = 0.15f) to Color.Gray
+        ApplicationStatus.NO_RESPONSE -> Color.Black.copy(alpha = 0.15f) to Color.Black
     }
 
     Text(

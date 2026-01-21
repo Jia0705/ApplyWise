@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Work
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
@@ -36,8 +37,11 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberTimePickerState
+import androidx.compose.material3.SelectableDates
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -51,6 +55,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.team.applywise.data.model.ApplicationStatus
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -100,6 +105,7 @@ fun AddApplicationScreen(
             onJobTitleChange = viewModel::onJobTitleChange,
             onStatusChange = viewModel::onStatusChange,
             onApplicationDateChange = viewModel::onApplicationDateChange,
+            onInterviewScheduledAtChange = viewModel::onInterviewScheduledAtChange,
             onSaveClick = viewModel::saveApplication
         )
     }
@@ -162,6 +168,7 @@ fun EditApplicationScreen(
                 onJobTitleChange = viewModel::onJobTitleChange,
                 onStatusChange = viewModel::onStatusChange,
                 onApplicationDateChange = viewModel::onApplicationDateChange,
+                onInterviewScheduledAtChange = viewModel::onInterviewScheduledAtChange,
                 onSaveClick = viewModel::saveApplication
             )
         }
@@ -178,11 +185,40 @@ fun ApplicationForm(
     onJobTitleChange: (String) -> Unit,
     onStatusChange: (ApplicationStatus) -> Unit,
     onApplicationDateChange: (Long) -> Unit,
+    onInterviewScheduledAtChange: (Long) -> Unit,
     onSaveClick: () -> Unit
 ) {
     var showDatePicker by remember { mutableStateOf(false) }
+    var showInterviewDatePicker by remember { mutableStateOf(false) }
+    var showInterviewTimePicker by remember { mutableStateOf(false) }
     var showStatusDropdown by remember { mutableStateOf(false) }
     val dateFormat = remember { SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()) }
+    val timeFormat = remember { SimpleDateFormat("hh:mm a", Locale.getDefault()) }
+
+    fun startOfTodayMillis(): Long {
+        val cal = Calendar.getInstance()
+        cal.set(Calendar.HOUR_OF_DAY, 0)
+        cal.set(Calendar.MINUTE, 0)
+        cal.set(Calendar.SECOND, 0)
+        cal.set(Calendar.MILLISECOND, 0)
+        return cal.timeInMillis
+    }
+
+    fun combineDateAndTime(dateMillis: Long, hour: Int, minute: Int): Long {
+        val cal = Calendar.getInstance()
+        cal.timeInMillis = dateMillis
+        cal.set(Calendar.HOUR_OF_DAY, hour)
+        cal.set(Calendar.MINUTE, minute)
+        cal.set(Calendar.SECOND, 0)
+        cal.set(Calendar.MILLISECOND, 0)
+        return cal.timeInMillis
+    }
+
+    fun hourMinuteFromMillis(millis: Long): Pair<Int, Int> {
+        val cal = Calendar.getInstance()
+        cal.timeInMillis = millis
+        return cal.get(Calendar.HOUR_OF_DAY) to cal.get(Calendar.MINUTE)
+    }
 
     Column(
         modifier = modifier
@@ -272,6 +308,50 @@ fun ApplicationForm(
             }
         }
 
+        if (uiState.status == ApplicationStatus.INTERVIEW_SCHEDULED) {
+            val interviewMillis = uiState.interviewScheduledAt
+
+            OutlinedTextField(
+                value = interviewMillis?.let { dateFormat.format(Date(it)) } ?: "",
+                onValueChange = {},
+                label = { Text("Interview Date *") },
+                leadingIcon = { Icon(Icons.Default.CalendarToday, contentDescription = null) },
+                placeholder = { Text("Select date") },
+                isError = uiState.interviewScheduledAtError != null,
+                supportingText = {
+                    uiState.interviewScheduledAtError?.let { Text(it) }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showInterviewDatePicker = true },
+                enabled = false,
+                colors = OutlinedTextFieldDefaults.colors(
+                    disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                    disabledBorderColor = MaterialTheme.colorScheme.outline,
+                    disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            )
+
+            OutlinedTextField(
+                value = interviewMillis?.let { timeFormat.format(Date(it)) } ?: "",
+                onValueChange = {},
+                label = { Text("Interview Time *") },
+                leadingIcon = { Icon(Icons.Default.Info, contentDescription = null) },
+                placeholder = { Text("Select time") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showInterviewTimePicker = true },
+                enabled = false,
+                colors = OutlinedTextFieldDefaults.colors(
+                    disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                    disabledBorderColor = MaterialTheme.colorScheme.outline,
+                    disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            )
+        }
+
         Spacer(modifier = Modifier.height(16.dp))
 
         // Save Button
@@ -320,5 +400,76 @@ fun ApplicationForm(
         ) {
             DatePicker(state = datePickerState)
         }
+    }
+
+    if (showInterviewDatePicker) {
+        val initialDate = uiState.interviewScheduledAt ?: System.currentTimeMillis()
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = initialDate,
+            selectableDates = object : SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long): Boolean {
+                    return utcTimeMillis >= startOfTodayMillis()
+                }
+            }
+        )
+        DatePickerDialog(
+            onDismissRequest = { showInterviewDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val selectedDate = datePickerState.selectedDateMillis
+                        if (selectedDate != null) {
+                            val baseTime = uiState.interviewScheduledAt ?: System.currentTimeMillis()
+                            val (hour, minute) = hourMinuteFromMillis(baseTime)
+                            onInterviewScheduledAtChange(combineDateAndTime(selectedDate, hour, minute))
+                        }
+                        showInterviewDatePicker = false
+                    }
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showInterviewDatePicker = false }) {
+                    Text("Cancel")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    if (showInterviewTimePicker) {
+        val baseTime = uiState.interviewScheduledAt ?: System.currentTimeMillis()
+        val (initialHour, initialMinute) = hourMinuteFromMillis(baseTime)
+        val timePickerState = rememberTimePickerState(
+            initialHour = initialHour,
+            initialMinute = initialMinute,
+            is24Hour = false
+        )
+       AlertDialog(
+            onDismissRequest = { showInterviewTimePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val baseDate = uiState.interviewScheduledAt ?: System.currentTimeMillis()
+                        onInterviewScheduledAtChange(
+                            combineDateAndTime(baseDate, timePickerState.hour, timePickerState.minute)
+                        )
+                        showInterviewTimePicker = false
+                    }
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showInterviewTimePicker = false }) {
+                    Text("Cancel")
+                }
+            },
+            text = {
+                TimePicker(state = timePickerState)
+            }
+        )
     }
 }
