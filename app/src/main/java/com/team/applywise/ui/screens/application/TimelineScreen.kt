@@ -22,7 +22,6 @@ import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.filled.Update
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -49,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.team.applywise.data.model.ApplicationStatus
+import com.team.applywise.data.model.StatusChange
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -99,6 +99,12 @@ fun TimelineScreen(
                 
                 // Generate timeline events
                 val events = remember(application) {
+                    val statusHistory = application.statusHistory.ifEmpty {
+                        listOf(StatusChange(ApplicationStatus.APPLIED, application.applicationDate))
+                    }
+                    val interviewStatusChange = statusHistory.lastOrNull {
+                        it.status == ApplicationStatus.INTERVIEW_SCHEDULED
+                    }?.timestamp
                     buildList {
                         // Application created
                         add(
@@ -110,79 +116,79 @@ fun TimelineScreen(
                             )
                         )
 
-                        // Application submitted
-                        add(
-                            TimelineEvent(
-                                title = "Applied to ${application.companyName}",
-                                description = "Position: ${application.jobTitle}",
-                                timestamp = application.applicationDate,
-                                icon = Icons.Default.Send
-                            )
-                        )
-
-                        // Status milestone
-                        when (application.status) {
-                            ApplicationStatus.INTERVIEW_SCHEDULED -> {
-                                add(
-                                    TimelineEvent(
-                                        title = "Interview Scheduled",
-                                        description = "You have an upcoming interview",
-                                        timestamp = application.updatedAt,
-                                        icon = Icons.Default.Event
+                        // Status changes
+                        statusHistory.forEach { change ->
+                            when (change.status) {
+                                ApplicationStatus.APPLIED -> {
+                                    add(
+                                        TimelineEvent(
+                                            title = "Applied to ${application.companyName}",
+                                            description = "Position: ${application.jobTitle}",
+                                            timestamp = change.timestamp,
+                                            icon = Icons.Default.Send
+                                        )
                                     )
-                                )
-                            }
-                            ApplicationStatus.INTERVIEW_COMPLETED -> {
-                                add(
-                                    TimelineEvent(
-                                        title = "Interview Completed",
-                                        description = "You completed the interview process",
-                                        timestamp = application.updatedAt,
-                                        icon = Icons.Default.CheckCircle
+                                }
+                                ApplicationStatus.INTERVIEW_SCHEDULED -> {
+                                    add(
+                                        TimelineEvent(
+                                            title = "Interview Scheduled",
+                                            description = "Status updated to Interview Scheduled",
+                                            timestamp = change.timestamp,
+                                            icon = Icons.Default.Event
+                                        )
                                     )
-                                )
-                            }
-                            ApplicationStatus.OFFER_RECEIVED -> {
-                                add(
-                                    TimelineEvent(
-                                        title = "Offer Received",
-                                        description = "Congratulations! You received an offer",
-                                        timestamp = application.updatedAt,
-                                        icon = Icons.Default.EmojiEvents
+                                }
+                                ApplicationStatus.INTERVIEW_COMPLETED -> {
+                                    add(
+                                        TimelineEvent(
+                                            title = "Interview Completed",
+                                            description = "You completed the interview process",
+                                            timestamp = change.timestamp,
+                                            icon = Icons.Default.CheckCircle
+                                        )
                                     )
-                                )
-                            }
-                            ApplicationStatus.REJECTED -> {
-                                add(
-                                    TimelineEvent(
-                                        title = "Application Rejected",
-                                        description = "Keep applying, success is around the corner",
-                                        timestamp = application.updatedAt,
-                                        icon = Icons.Default.Cancel
+                                }
+                                ApplicationStatus.OFFER_RECEIVED -> {
+                                    add(
+                                        TimelineEvent(
+                                            title = "Offer Received",
+                                            description = "Congratulations! You received an offer",
+                                            timestamp = change.timestamp,
+                                            icon = Icons.Default.EmojiEvents
+                                        )
                                     )
-                                )
-                            }
-                            ApplicationStatus.NO_RESPONSE -> {
-                                add(
-                                    TimelineEvent(
-                                        title = "No Response Yet",
-                                        description = "Waiting to hear back from the company",
-                                        timestamp = application.updatedAt,
-                                        icon = Icons.Default.HourglassEmpty
+                                }
+                                ApplicationStatus.REJECTED -> {
+                                    add(
+                                        TimelineEvent(
+                                            title = "Application Rejected",
+                                            description = "Keep applying, success is around the corner",
+                                            timestamp = change.timestamp,
+                                            icon = Icons.Default.Cancel
+                                        )
                                     )
-                                )
+                                }
+                                ApplicationStatus.NO_RESPONSE -> {
+                                    add(
+                                        TimelineEvent(
+                                            title = "No Response Yet",
+                                            description = "Waiting to hear back from the company",
+                                            timestamp = change.timestamp,
+                                            icon = Icons.Default.HourglassEmpty
+                                        )
+                                    )
+                                }
                             }
-                            else -> {}
                         }
 
-                        // Last updated (if different from created)
-                        if (application.updatedAt != application.createdAt) {
+                        application.interviewScheduledAt?.let { interviewTime ->
                             add(
                                 TimelineEvent(
-                                    title = "Last Updated",
-                                    description = "Application status: ${application.status.displayName}",
-                                    timestamp = application.updatedAt,
-                                    icon = Icons.Default.Update
+                                    title = "Interview Scheduled For",
+                                    description = "Scheduled for: ${dateFormat.format(Date(interviewTime))}",
+                                    timestamp = interviewStatusChange ?: application.updatedAt,
+                                    icon = Icons.Default.Event
                                 )
                             )
                         }

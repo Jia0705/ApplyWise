@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.team.applywise.data.model.ApplicationStatus
 import com.team.applywise.data.model.JobApplication
+import com.team.applywise.data.model.StatusChange
 import com.team.applywise.data.repo.JobApplicationRepo
 import com.team.applywise.service.AuthService
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -47,7 +48,10 @@ class ApplicationFormViewModel @Inject constructor(
                             jobTitle = it.jobTitle,
                             status = it.status,
                             applicationDate = it.applicationDate,
-                            createdAt = it.createdAt
+                            interviewScheduledAt = it.interviewScheduledAt,
+                            createdAt = it.createdAt,
+                            originalStatus = it.status,
+                            statusHistory = it.statusHistory
                         )
                     }
                 }
@@ -66,11 +70,26 @@ class ApplicationFormViewModel @Inject constructor(
     }
 
     fun onStatusChange(value: ApplicationStatus) {
-        _uiState.update { it.copy(status = value) }
+        val clearedInterviewDate = if (value == ApplicationStatus.INTERVIEW_SCHEDULED) {
+            _uiState.value.interviewScheduledAt
+        } else {
+            null
+        }
+        _uiState.update {
+            it.copy(
+                status = value,
+                interviewScheduledAt = clearedInterviewDate,
+                interviewScheduledAtError = null
+            )
+        }
     }
 
     fun onApplicationDateChange(value: Long) {
         _uiState.update { it.copy(applicationDate = value) }
+    }
+
+    fun onInterviewScheduledAtChange(value: Long) {
+        _uiState.update { it.copy(interviewScheduledAt = value, interviewScheduledAtError = null) }
     }
 
     fun saveApplication() {
@@ -93,13 +112,42 @@ class ApplicationFormViewModel @Inject constructor(
             return
         }
 
+        val interviewError = if (_uiState.value.status == ApplicationStatus.INTERVIEW_SCHEDULED) {
+            val interviewTime = _uiState.value.interviewScheduledAt
+            when {
+                interviewTime == null -> "Interview date and time are required"
+                interviewTime < System.currentTimeMillis() -> "Interview date/time cannot be in the past"
+                else -> null
+            }
+        } else {
+            null
+        }
+        if (interviewError != null) {
+            _uiState.update { it.copy(interviewScheduledAtError = interviewError) }
+            return
+        }
+
         val userId = authService.getCurrentUser()?.uid ?: return
 
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true, error = null) }
             
             try {
+                val now = System.currentTimeMillis()
                 if (isEditMode && applicationId != null) {
+                    val existingHistory = _uiState.value.statusHistory.ifEmpty {
+                        listOf(
+                            StatusChange(
+                                _uiState.value.originalStatus,
+                                _uiState.value.createdAt
+                            )
+                        )
+                    }
+                    val updatedHistory = if (_uiState.value.status != _uiState.value.originalStatus) {
+                        existingHistory + StatusChange(_uiState.value.status, now)
+                    } else {
+                        existingHistory
+                    }
                     // Update application
                     val application = JobApplication(
                         id = applicationId,
@@ -108,19 +156,28 @@ class ApplicationFormViewModel @Inject constructor(
                         jobTitle = _uiState.value.jobTitle,
                         status = _uiState.value.status,
                         applicationDate = _uiState.value.applicationDate,
+                        interviewScheduledAt = _uiState.value.interviewScheduledAt,
                         createdAt = _uiState.value.createdAt,
-                        updatedAt = System.currentTimeMillis()
+                        updatedAt = now,
+                        statusHistory = updatedHistory
                     )
                     applicationRepo.updateApplication(application)
                     _uiState.update { it.copy(isSaving = false, saveSuccess = true) }
                 } else {
+                    val initialTimestamp = if (_uiState.value.status == ApplicationStatus.APPLIED) {
+                        _uiState.value.applicationDate
+                    } else {
+                        now
+                    }
                     // Create new application
                     val application = JobApplication(
                         userId = userId,
                         companyName = _uiState.value.companyName,
                         jobTitle = _uiState.value.jobTitle,
                         status = _uiState.value.status,
-                        applicationDate = _uiState.value.applicationDate
+                        applicationDate = _uiState.value.applicationDate,
+                        interviewScheduledAt = _uiState.value.interviewScheduledAt,
+                        statusHistory = listOf(StatusChange(_uiState.value.status, initialTimestamp))
                     )
                     applicationRepo.createApplication(application)
                     _uiState.update { it.copy(isSaving = false, saveSuccess = true) }
@@ -146,7 +203,11 @@ data class ApplicationFormUiState(
     val jobTitle: String = "",
     val status: ApplicationStatus = ApplicationStatus.APPLIED,
     val applicationDate: Long = System.currentTimeMillis(),
+    val interviewScheduledAt: Long? = null,
     val createdAt: Long = System.currentTimeMillis(),
+    val originalStatus: ApplicationStatus = ApplicationStatus.APPLIED,
+    val statusHistory: List<StatusChange> = emptyList(),
     val companyNameError: String? = null,
-    val jobTitleError: String? = null
+    val jobTitleError: String? = null,
+    val interviewScheduledAtError: String? = null
 )
