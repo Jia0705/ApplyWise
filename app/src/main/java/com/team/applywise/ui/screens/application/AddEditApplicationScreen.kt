@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Work
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -308,48 +309,79 @@ fun ApplicationForm(
             }
         }
 
+        // Interview Scheduled (Interview Date)
         if (uiState.status == ApplicationStatus.INTERVIEW_SCHEDULED) {
             val interviewMillis = uiState.interviewScheduledAt
 
-            OutlinedTextField(
-                value = interviewMillis?.let { dateFormat.format(Date(it)) } ?: "",
-                onValueChange = {},
-                label = { Text("Interview Date *") },
-                leadingIcon = { Icon(Icons.Default.CalendarToday, contentDescription = null) },
-                placeholder = { Text("Select date") },
-                isError = uiState.interviewScheduledAtError != null,
-                supportingText = {
-                    uiState.interviewScheduledAtError?.let { Text(it) }
-                },
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { showInterviewDatePicker = true },
-                enabled = false,
-                colors = OutlinedTextFieldDefaults.colors(
-                    disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                    disabledBorderColor = MaterialTheme.colorScheme.outline,
-                    disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            )
+                    .clickable { showInterviewDatePicker = true }
+            ) {
+                OutlinedTextField(
+                    value = interviewMillis?.let { dateFormat.format(Date(it)) } ?: "",
+                    onValueChange = {},
+                    label = { Text("Interview Date *") },
+                    leadingIcon = { Icon(Icons.Default.CalendarToday, contentDescription = null) },
+                    placeholder = { Text("Select date") },
+                    isError = uiState.interviewScheduledAtError != null,
+                    supportingText = {
+                        uiState.interviewScheduledAtError?.let {
+                            Text(
+                                text = it,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    },
+                    readOnly = true,
+                    enabled = false,
 
-            OutlinedTextField(
-                value = interviewMillis?.let { timeFormat.format(Date(it)) } ?: "",
-                onValueChange = {},
-                label = { Text("Interview Time *") },
-                leadingIcon = { Icon(Icons.Default.Info, contentDescription = null) },
-                placeholder = { Text("Select time") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { showInterviewTimePicker = true },
-                enabled = false,
-                colors = OutlinedTextFieldDefaults.colors(
-                    disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                    disabledBorderColor = MaterialTheme.colorScheme.outline,
-                    disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                        disabledBorderColor =
+                            if (uiState.interviewScheduledAtError != null)
+                                MaterialTheme.colorScheme.error
+                            else
+                                MaterialTheme.colorScheme.outline,
+                        disabledLeadingIconColor =
+                            if (uiState.interviewScheduledAtError != null)
+                                MaterialTheme.colorScheme.error
+                            else
+                                MaterialTheme.colorScheme.onSurfaceVariant,
+                        disabledLabelColor =
+                            if (uiState.interviewScheduledAtError != null)
+                                MaterialTheme.colorScheme.error
+                            else
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 )
-            )
+            }
+
+            // Interview Scheduled (Interview Time)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable { showInterviewTimePicker =  true}
+            ) {
+                OutlinedTextField(
+                    value = interviewMillis?.let { timeFormat.format(Date(it)) } ?: "",
+                    onValueChange = {},
+                    label = { Text("Interview Time *") },
+                    leadingIcon = { Icon(Icons.Default.Info, contentDescription = null) },
+                    placeholder = { Text("Select time") },
+                    readOnly = true,
+                    enabled = false,
+
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                        disabledBorderColor = MaterialTheme.colorScheme.outline,
+                        disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -357,10 +389,16 @@ fun ApplicationForm(
         // Save Button
         Button(
             onClick = onSaveClick,
+            enabled = !uiState.isSaving,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(50.dp),
-            enabled = !uiState.isSaving
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                disabledContainerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                disabledContentColor = MaterialTheme.colorScheme.onPrimary
+            )
         ) {
             if (uiState.isSaving) {
                 CircularProgressIndicator(

@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
@@ -47,6 +48,7 @@ fun RegisterScreen(
 ) {
     val context = LocalContext.current
 
+    var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
@@ -81,6 +83,19 @@ fun RegisterScreen(
                     color = MaterialTheme.colorScheme.primary
                 )
                 Spacer(Modifier.height(24.dp))
+
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Username") },
+                    leadingIcon = {
+                        Icon(Icons.Default.Person, contentDescription = null)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    singleLine = true
+                )
+                Spacer(Modifier.height(16.dp))
 
                 OutlinedTextField(
                     value = email,
@@ -160,6 +175,7 @@ fun RegisterScreen(
                 Button(
                     onClick = {
                         viewModel.register(
+                            name = name,
                             email = email,
                             password = password,
                             confirmPassword = confirmPassword,

@@ -38,6 +38,7 @@ class LoginViewModel @Inject constructor(
                     userRepo.createUser(
                         User(
                             uid = user.uid,
+                            name = user.name,
                             email = user.email.ifBlank { email }
                         )
                     )
@@ -69,6 +70,7 @@ class LoginViewModel @Inject constructor(
                         userRepo.createUser(
                             User(
                                 uid = user.uid,
+                                name = user.name,
                                 email = user.email
                             )
                         )

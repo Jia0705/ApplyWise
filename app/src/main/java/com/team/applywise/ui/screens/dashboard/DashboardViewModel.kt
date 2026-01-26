@@ -47,10 +47,12 @@ class DashboardViewModel @Inject constructor(
                             isLoading = false,
                             recentApplications = applications.take(5),
                             totalApplications = counts.values.sum(),
-                            interviewingCount = (counts[ApplicationStatus.INTERVIEW_SCHEDULED] ?: 0) + (counts[ApplicationStatus.INTERVIEW_COMPLETED] ?: 0),
+                            interviewScheduledCount = counts[ApplicationStatus.INTERVIEW_SCHEDULED] ?: 0,
+                            interviewCompletedCount = counts[ApplicationStatus.INTERVIEW_COMPLETED] ?: 0,
                             offersCount = counts[ApplicationStatus.OFFER_RECEIVED] ?: 0,
                             rejectedCount = counts[ApplicationStatus.REJECTED] ?: 0,
                             noResponseCount = counts[ApplicationStatus.NO_RESPONSE] ?: 0,
+                            statusCounts = counts,
                             error = null
                         )
                     }
@@ -72,9 +74,11 @@ data class DashboardUiState(
     val isLoading: Boolean = true,
     val error: String? = null,
     val totalApplications: Int = 0,
-    val interviewingCount: Int = 0,
+    val interviewScheduledCount: Int = 0,
+    val interviewCompletedCount: Int = 0,
     val offersCount: Int = 0,
     val rejectedCount: Int = 0,
     val noResponseCount: Int = 0,
+    val statusCounts: Map<ApplicationStatus, Int> = emptyMap(),
     val recentApplications: List<JobApplication> = emptyList()
 )

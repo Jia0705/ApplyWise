@@ -10,6 +10,7 @@ import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.UserProfileChangeRequest
 import com.team.applywise.core.constants.Constants
 import com.team.applywise.data.model.User
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,12 +32,14 @@ class AuthService @Inject constructor(
     }
 
     private fun updateUser(firebaseUser: FirebaseUser) {
+        val existingAvatarColor = _user.value?.avatarColor ?: ""
         _user.update {
             User(
                 uid = firebaseUser.uid,
-//                name = firebaseUser.displayName ?: "Unknown",
+                name = firebaseUser.displayName ?: "Unknown",
                 email = firebaseUser.email ?: "",
-//                photoURL = firebaseUser.photoUrl?.toString() ?: ""
+                photoURL = firebaseUser.photoUrl?.toString() ?: "",
+                avatarColor = existingAvatarColor
             )
         }
     }
@@ -51,14 +54,31 @@ class AuthService @Inject constructor(
     }
 
     // Email Authentication
-    suspend fun registerWithEmail(email: String, password: String) {
+    suspend fun registerWithEmail(name: String, email: String, password: String) {
         firebaseAuth.createUserWithEmailAndPassword(email, password).await()
-        firebaseAuth.currentUser?.let { updateUser(it) }
+
+        val firebaseUser = firebaseAuth.currentUser
+        firebaseUser?.updateProfile(UserProfileChangeRequest.Builder().setDisplayName(name).build())?.await()
+        firebaseUser?.let { updateUser(it) }
     }
 
     suspend fun loginWithEmail(email: String, password: String) {
         firebaseAuth.signInWithEmailAndPassword(email, password).await()
         firebaseAuth.currentUser?.let { updateUser(it) }
+    }
+
+    suspend fun updateDisplayName(name: String) {
+        val firebaseUser = firebaseAuth.currentUser ?: return
+        firebaseUser.updateProfile(
+            UserProfileChangeRequest.Builder().setDisplayName(name).build()
+        ).await()
+        updateUser(firebaseUser)
+    }
+
+    fun updateAvatarColor(colorName: String) {
+        _user.update { current ->
+            (current ?: User()).copy(avatarColor = colorName)
+        }
     }
 
     // Sign out
