@@ -8,10 +8,11 @@ sealed class Screen {
     @Serializable object Login : Screen()
     @Serializable object Register : Screen()
     @Serializable object Dashboard : Screen()
-    @Serializable object ApplicationList : Screen()
+    @Serializable data class ApplicationList(val filter: String? = null) : Screen()
     @Serializable data class ApplicationDetail(val applicationId: String) : Screen()
     @Serializable object AddApplication : Screen()
     @Serializable data class EditApplication(val applicationId: String) : Screen()
     @Serializable data class Timeline(val applicationId: String) : Screen()
     @Serializable object Profile : Screen()
+    @Serializable object EditProfile : Screen()
 }

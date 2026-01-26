@@ -61,12 +61,17 @@ fun ApplicationListScreen(
     onNavigateToDetail: (String) -> Unit,
     onNavigateToAdd: () -> Unit,
     onNavigateBack: () -> Unit,
+    initialFilter: String? = null,
     viewModel: ApplicationListViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val selectedFilter by viewModel.selectedFilter.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(initialFilter) {
+        viewModel.onFilterSelected(initialFilter)
+    }
 
     // Show error messages
     LaunchedEffect(uiState.error) {
@@ -136,8 +141,8 @@ fun ApplicationListScreen(
                 }
                 items(ApplicationStatus.entries.toTypedArray()) { status ->
                     FilterChip(
-                        selected = selectedFilter == status,
-                        onClick = { viewModel.onFilterSelected(status) },
+                        selected = selectedFilter == status.name,
+                        onClick = { viewModel.onFilterSelected(status.name) },
                         label = { Text(status.displayName) }
                     )
                 }

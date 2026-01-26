@@ -24,19 +24,35 @@ class ProfileViewModel @Inject constructor(
         loadUserInfo()
     }
 
+    fun refresh() {
+        loadUserInfo()
+    }
+
     private fun loadUserInfo() {
         val authUser = authService.getCurrentUser()
         if (authUser == null) {
-            _uiState.update { it.copy(email = "Unknown") }
+            _uiState.update { it.copy(name = "Unknown", email = "Unknown") }
             return
+        }
+
+        _uiState.update {
+            it.copy(
+                name = authUser.name,
+                email = authUser.email,
+                avatarColor = authUser.avatarColor.ifBlank { it.avatarColor }
+            )
         }
 
         viewModelScope.launch {
             val user = userRepo.getUser(authUser.uid)
-            _uiState.update {
-                it.copy(
-                    email = user?.email ?: authUser.email
-                )
+            if (user != null && (user.name.isNotBlank() || user.email.isNotBlank() || user.avatarColor.isNotBlank())) {
+                _uiState.update {
+                    it.copy(
+                        name = user.name.ifBlank { authUser.name },
+                        email = user.email.ifBlank { authUser.email },
+                        avatarColor = user.avatarColor.ifBlank { it.avatarColor }
+                    )
+                }
             }
         }
     }
@@ -49,6 +65,8 @@ class ProfileViewModel @Inject constructor(
 
 // UI state for Profile screen
 data class ProfileUiState(
+    val name: String = "",
     val email: String = "",
+    val avatarColor: String = "",
     val logoutSuccess: Boolean = false
 )

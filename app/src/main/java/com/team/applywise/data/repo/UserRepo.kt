@@ -1,6 +1,7 @@
 package com.team.applywise.data.repo
 
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import com.team.applywise.data.model.User
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
@@ -24,5 +25,13 @@ class UserRepo @Inject constructor(
     suspend fun getUser(uid: String): User? {
         val snapshot = usersCollection.document(uid).get().await()
         return snapshot.toObject(User::class.java)
+    }
+
+    suspend fun updateUserProfile(uid: String, name: String, avatarColor: String) {
+        val updates = mapOf(
+            "name" to name,
+            "avatarColor" to avatarColor
+        )
+        usersCollection.document(uid).set(updates, SetOptions.merge()).await()
     }
 }

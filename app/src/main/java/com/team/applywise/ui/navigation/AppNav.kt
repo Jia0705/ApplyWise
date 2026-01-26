@@ -30,6 +30,7 @@ import com.team.applywise.ui.screens.application.EditApplicationScreen
 import com.team.applywise.ui.screens.application.TimelineScreen
 import com.team.applywise.ui.screens.dashboard.DashboardScreen
 import com.team.applywise.ui.screens.login.LoginScreen
+import com.team.applywise.ui.screens.profile.EditProfileScreen
 import com.team.applywise.ui.screens.profile.ProfileScreen
 import com.team.applywise.ui.screens.register.RegisterScreen
 import com.team.applywise.ui.screens.splash.SplashScreen
@@ -38,22 +39,30 @@ import com.team.applywise.ui.screens.splash.SplashScreen
 fun AppNav(
     navController: NavHostController
 ) {
+    val navigateToApplicationList: () -> Unit = {
+        navController.navigate(Screen.ApplicationList()) {
+            popUpTo<Screen.ApplicationDetail> { inclusive = true }
+            launchSingleTop = true
+        }
+    }
     val bottomNavItems = remember {
         listOf(
             BottomNavItem("Dashboard", Screen.Dashboard, Icons.Default.Dashboard),
-            BottomNavItem("Applications", Screen.ApplicationList, Icons.Default.Work),
+            BottomNavItem("Applications", Screen.ApplicationList(), Icons.Default.Work),
             BottomNavItem("Profile", Screen.Profile, Icons.Default.AccountCircle)
         )
     }
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
-    val bottomNavRoutes = setOf(
+    val bottomNavRoutes = listOfNotNull(
         Screen.Dashboard::class.qualifiedName,
         Screen.ApplicationList::class.qualifiedName,
         Screen.Profile::class.qualifiedName
     )
-    val showBottomBar = currentRoute in bottomNavRoutes
+    val showBottomBar = bottomNavRoutes.any { routeKey ->
+        currentRoute?.startsWith(routeKey) == true
+    }
 
     Scaffold(
         bottomBar = {
@@ -102,8 +111,8 @@ fun AppNav(
 
                 composable<Screen.Dashboard> {
                     DashboardScreen(
-                        onNavigateToApplicationList = {
-                            navController.navigate(Screen.ApplicationList)
+                        onNavigateToApplicationList = { filter ->
+                            navController.navigate(Screen.ApplicationList(filter))
                         },
                         onNavigateToAddApplication = {
                             navController.navigate(Screen.AddApplication)
@@ -114,7 +123,8 @@ fun AppNav(
                     )
                 }
 
-                composable<Screen.ApplicationList> {
+                composable<Screen.ApplicationList> { backStackEntry ->
+                    val args = backStackEntry.toRoute<Screen.ApplicationList>()
                     ApplicationListScreen(
                         onNavigateToDetail = { applicationId ->
                             navController.navigate(Screen.ApplicationDetail(applicationId))
@@ -123,8 +133,12 @@ fun AppNav(
                             navController.navigate(Screen.AddApplication)
                         },
                         onNavigateBack = {
-                            navController.popBackStack()
-                        }
+                            navController.navigate(Screen.Dashboard) {
+                                popUpTo<Screen.Dashboard> { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        },
+                        initialFilter = args.filter
                     )
                 }
 
@@ -133,7 +147,7 @@ fun AppNav(
                     ApplicationDetailScreen(
                         applicationId = args.applicationId,
                         onNavigateBack = {
-                            navController.popBackStack()
+                            navigateToApplicationList()
                         },
                         onNavigateToEdit = { id ->
                             navController.navigate(Screen.EditApplication(id))
@@ -142,7 +156,7 @@ fun AppNav(
                             navController.navigate(Screen.Timeline(id))
                         },
                         onApplicationDeleted = {
-                            navController.popBackStack()
+                            navigateToApplicationList()
                         }
                     )
                 }
@@ -181,12 +195,33 @@ fun AppNav(
                     )
                 }
 
-                composable<Screen.Profile> {
+                composable<Screen.Profile> { backStackEntry ->
                     ProfileScreen(
+                        onEditProfile = {
+                            navController.navigate(Screen.EditProfile)
+                        },
+                        showUpdateMessage = backStackEntry.savedStateHandle.get<Boolean>("profile_updated") == true,
+                        onMessageShown = {
+                            backStackEntry.savedStateHandle.set("profile_updated", false)
+                        },
                         onLogout = {
                             navController.navigate(Screen.Login) {
                                 popUpTo(0) { inclusive = true }
                             }
+                        }
+                    )
+                }
+
+                composable<Screen.EditProfile> {
+                    EditProfileScreen(
+                        onNavigateBack = {
+                            navController.popBackStack()
+                        },
+                        onSaveSuccess = {
+                            navController.previousBackStackEntry
+                                ?.savedStateHandle
+                                ?.set("profile_updated", true)
+                            navController.popBackStack()
                         }
                     )
                 }

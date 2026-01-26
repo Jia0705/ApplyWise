@@ -29,7 +29,7 @@ class ApplicationListViewModel @Inject constructor(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery = _searchQuery.asStateFlow()
 
-    private val _selectedFilter = MutableStateFlow<ApplicationStatus?>(null)
+    private val _selectedFilter = MutableStateFlow<String?>(null)
     val selectedFilter = _selectedFilter.asStateFlow()
 
     init {
@@ -49,7 +49,8 @@ class ApplicationListViewModel @Inject constructor(
 
                 // Apply status filter
                 if (filter != null) {
-                    filtered = filtered.filter { it.status == filter }
+                    val status = ApplicationStatus.fromString(filter)
+                    filtered = filtered.filter { it.status == status }
                 }
 
                 // Apply search query
@@ -81,8 +82,8 @@ class ApplicationListViewModel @Inject constructor(
         _searchQuery.value = query
     }
 
-    fun onFilterSelected(status: ApplicationStatus?) {
-        _selectedFilter.value = status
+    fun onFilterSelected(filter: String?) {
+        _selectedFilter.value = filter
     }
 
     fun clearError() {
