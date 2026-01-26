@@ -163,6 +163,7 @@ fun AppNav(
 
                 composable<Screen.AddApplication> {
                     AddApplicationScreen(
+                        navController = navController,
                         onNavigateBack = {
                             navController.popBackStack()
                         },
@@ -175,6 +176,7 @@ fun AppNav(
                 composable<Screen.EditApplication> { backStackEntry ->
                     val args = backStackEntry.toRoute<Screen.EditApplication>()
                     EditApplicationScreen(
+                        navController = navController,
                         applicationId = args.applicationId,
                         onNavigateBack = {
                             navController.popBackStack()
@@ -214,6 +216,7 @@ fun AppNav(
 
                 composable<Screen.EditProfile> {
                     EditProfileScreen(
+                        navController = navController,
                         onNavigateBack = {
                             navController.popBackStack()
                         },

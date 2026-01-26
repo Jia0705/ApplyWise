@@ -1,5 +1,6 @@
 package com.team.applywise.ui.screens.application
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -54,7 +55,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavController
 import com.team.applywise.data.model.ApplicationStatus
+import com.team.applywise.ui.components.DiscardChangesDialog
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -64,12 +67,21 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddApplicationScreen(
+    navController: NavController,
     onNavigateBack: () -> Unit,
     onApplicationAdded: () -> Unit,
-    viewModel: ApplicationFormViewModel = hiltViewModel()
+    viewModel: AddEditApplicationViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    var showDiscardDialog by remember { mutableStateOf(false) }
+    var initialState by remember { mutableStateOf<ApplicationFormUiState?>(null) }
+
+    LaunchedEffect(uiState.isLoading) {
+        if (!uiState.isLoading && initialState == null) {
+            initialState = uiState
+        }
+    }
 
     // Handle save success
     LaunchedEffect(uiState.saveSuccess) {
@@ -86,13 +98,37 @@ fun AddApplicationScreen(
         }
     }
 
+    val hasChanges = initialState?.let {
+        uiState.companyName != it.companyName ||
+                uiState.jobTitle != it.jobTitle ||
+                uiState.status != it.status ||
+                uiState.applicationDate != it.applicationDate ||
+                uiState.interviewScheduledAt != it.interviewScheduledAt
+    } ?: false
+
+    BackHandler {
+        if (hasChanges) {
+            showDiscardDialog = true
+        } else {
+            navController.popBackStack()
+        }
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Add Application") },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(
+                        onClick = {
+                            if (hasChanges) {
+                                showDiscardDialog = true
+                            } else {
+                                navController.popBackStack()
+                            }
+                        }
+                    ) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 }
@@ -110,19 +146,38 @@ fun AddApplicationScreen(
             onSaveClick = viewModel::saveApplication
         )
     }
+
+    if (showDiscardDialog) {
+        DiscardChangesDialog(
+            onDiscard = {
+                showDiscardDialog = false
+                navController.popBackStack()
+            },
+            onDismiss = { showDiscardDialog = false }
+        )
+    }
 }
 
 // Edit Application
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditApplicationScreen(
+    navController: NavController,
     applicationId: String,
     onNavigateBack: () -> Unit,
     onApplicationUpdated: () -> Unit,
-    viewModel: ApplicationFormViewModel = hiltViewModel()
+    viewModel: AddEditApplicationViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    var showDiscardDialog by remember { mutableStateOf(false) }
+    var initialState by remember { mutableStateOf<ApplicationFormUiState?>(null) }
+
+    LaunchedEffect(uiState.isLoading) {
+        if (!uiState.isLoading && initialState == null) {
+            initialState = uiState
+        }
+    }
 
     // Handle save success
     LaunchedEffect(uiState.saveSuccess) {
@@ -139,13 +194,37 @@ fun EditApplicationScreen(
         }
     }
 
+    val hasChanges = initialState?.let {
+        uiState.companyName != it.companyName ||
+                uiState.jobTitle != it.jobTitle ||
+                uiState.status != it.status ||
+                uiState.applicationDate != it.applicationDate ||
+                uiState.interviewScheduledAt != it.interviewScheduledAt
+    } ?: false
+
+    BackHandler {
+        if (hasChanges) {
+            showDiscardDialog = true
+        } else {
+            navController.popBackStack()
+        }
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Edit Application") },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(
+                        onClick = {
+                            if (hasChanges) {
+                                showDiscardDialog = true
+                            } else {
+                                navController.popBackStack()
+                            }
+                        }
+                    ) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 }
@@ -173,6 +252,16 @@ fun EditApplicationScreen(
                 onSaveClick = viewModel::saveApplication
             )
         }
+    }
+
+    if (showDiscardDialog) {
+        DiscardChangesDialog(
+            onDiscard = {
+                showDiscardDialog = false
+                navController.popBackStack()
+            },
+            onDismiss = { showDiscardDialog = false }
+        )
     }
 }
 

@@ -1,5 +1,6 @@
 package com.team.applywise.ui.screens.profile
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Column
@@ -45,12 +46,16 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.navigation.NavController
+import com.team.applywise.ui.components.DiscardChangesDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditProfileScreen(
+    navController: NavController,
     onNavigateBack: () -> Unit,
     onSaveSuccess: () -> Unit,
     viewModel: EditProfileViewModel = hiltViewModel()
@@ -65,6 +70,14 @@ fun EditProfileScreen(
         "green" to Color.Green,
         "blue" to Color.Blue
     )
+    var showDiscardDialog by remember { mutableStateOf(false) }
+    var initialState by remember { mutableStateOf<EditProfileUiState?>(null) }
+
+    LaunchedEffect(uiState.isLoading) {
+        if (!uiState.isLoading && initialState == null) {
+            initialState = uiState
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.clearSaveState()
@@ -80,13 +93,33 @@ fun EditProfileScreen(
         }
     }
 
+    val hasChanges = initialState?.let {
+        uiState.nameInput != it.nameInput || uiState.avatarColor != it.avatarColor
+    } ?: false
+
+    BackHandler {
+        if (hasChanges) {
+            showDiscardDialog = true
+        } else {
+            navController.popBackStack()
+        }
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Edit Profile") },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(
+                        onClick = {
+                            if (hasChanges) {
+                                showDiscardDialog = true
+                            } else {
+                                navController.popBackStack()
+                            }
+                        }
+                    ) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 },
@@ -208,6 +241,16 @@ fun EditProfileScreen(
                     Text("Close")
                 }
             }
+        )
+    }
+
+    if (showDiscardDialog) {
+        DiscardChangesDialog(
+            onDiscard = {
+                showDiscardDialog = false
+                navController.popBackStack()
+            },
+            onDismiss = { showDiscardDialog = false }
         )
     }
 }
