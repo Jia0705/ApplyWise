@@ -27,14 +27,21 @@ class EditProfileViewModel @Inject constructor(
     private fun loadUserInfo() {
         val authUser = authService.getCurrentUser()
         if (authUser == null) {
-            _uiState.update { it.copy(nameInput = "Unknown", email = "Unknown") }
+            _uiState.update {
+                it.copy(
+                    nameInput = "Unknown",
+                    email = "Unknown",
+                    isLoading = false
+                )
+            }
             return
         }
 
         _uiState.update {
             it.copy(
                 nameInput = authUser.name,
-                email = authUser.email
+                email = authUser.email,
+                isLoading = true
             )
         }
 
@@ -44,7 +51,8 @@ class EditProfileViewModel @Inject constructor(
                 it.copy(
                     nameInput = user?.name?.ifBlank { authUser.name } ?: authUser.name,
                     email = user?.email?.ifBlank { authUser.email } ?: authUser.email,
-                    avatarColor = user?.avatarColor ?: ""
+                    avatarColor = user?.avatarColor ?: "",
+                    isLoading = false
                 )
             }
         }
@@ -92,6 +100,7 @@ data class EditProfileUiState(
     val nameInput: String = "",
     val email: String = "",
     val avatarColor: String = "",
+    val isLoading: Boolean = false,
     val isSaving: Boolean = false,
     val saveSuccess: Boolean = false,
     val error: String? = null

@@ -16,7 +16,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class ApplicationFormViewModel @Inject constructor(
+class AddEditApplicationViewModel @Inject constructor(
     private val authService: AuthService,
     private val applicationRepo: JobApplicationRepo,
     savedStateHandle: SavedStateHandle
