@@ -62,6 +62,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone.getTimeZone
 
 // Add Application
 @OptIn(ExperimentalMaterial3Api::class)
@@ -103,7 +104,8 @@ fun AddApplicationScreen(
                 uiState.jobTitle != it.jobTitle ||
                 uiState.status != it.status ||
                 uiState.applicationDate != it.applicationDate ||
-                uiState.interviewScheduledAt != it.interviewScheduledAt
+                uiState.interviewScheduledAt != it.interviewScheduledAt ||
+                uiState.notes != it.notes
     } ?: false
 
     BackHandler {
@@ -143,6 +145,7 @@ fun AddApplicationScreen(
             onStatusChange = viewModel::onStatusChange,
             onApplicationDateChange = viewModel::onApplicationDateChange,
             onInterviewScheduledAtChange = viewModel::onInterviewScheduledAtChange,
+            onNotesChange = viewModel::onNotesChange,
             onSaveClick = viewModel::saveApplication
         )
     }
@@ -199,7 +202,8 @@ fun EditApplicationScreen(
                 uiState.jobTitle != it.jobTitle ||
                 uiState.status != it.status ||
                 uiState.applicationDate != it.applicationDate ||
-                uiState.interviewScheduledAt != it.interviewScheduledAt
+                uiState.interviewScheduledAt != it.interviewScheduledAt ||
+                uiState.notes != it.notes
     } ?: false
 
     BackHandler {
@@ -249,6 +253,7 @@ fun EditApplicationScreen(
                 onStatusChange = viewModel::onStatusChange,
                 onApplicationDateChange = viewModel::onApplicationDateChange,
                 onInterviewScheduledAtChange = viewModel::onInterviewScheduledAtChange,
+                onNotesChange = viewModel::onNotesChange,
                 onSaveClick = viewModel::saveApplication
             )
         }
@@ -276,6 +281,7 @@ fun ApplicationForm(
     onStatusChange: (ApplicationStatus) -> Unit,
     onApplicationDateChange: (Long) -> Unit,
     onInterviewScheduledAtChange: (Long) -> Unit,
+    onNotesChange: (String) -> Unit,
     onSaveClick: () -> Unit
 ) {
     var showDatePicker by remember { mutableStateOf(false) }
@@ -294,6 +300,15 @@ fun ApplicationForm(
         return cal.timeInMillis
     }
 
+    fun endOfTodayMillis(): Long {
+        val cal = Calendar.getInstance()
+        cal.set(Calendar.HOUR_OF_DAY, 23)
+        cal.set(Calendar.MINUTE, 59)
+        cal.set(Calendar.SECOND, 59)
+        cal.set(Calendar.MILLISECOND, 999)
+        return cal.timeInMillis
+    }
+
     fun combineDateAndTime(dateMillis: Long, hour: Int, minute: Int): Long {
         val cal = Calendar.getInstance()
         cal.timeInMillis = dateMillis
@@ -308,6 +323,21 @@ fun ApplicationForm(
         val cal = Calendar.getInstance()
         cal.timeInMillis = millis
         return cal.get(Calendar.HOUR_OF_DAY) to cal.get(Calendar.MINUTE)
+    }
+
+    fun localDateTimeMillisToUtcDateMillis(localMillis: Long): Long {
+        val cal = Calendar.getInstance()
+        cal.timeInMillis = localMillis
+
+        val year = cal.get(Calendar.YEAR)
+        val month = cal.get(Calendar.MONTH)
+        val day = cal.get(Calendar.DAY_OF_MONTH)
+
+        val utcCal = Calendar.getInstance(getTimeZone("UTC"))
+        utcCal.clear()
+        utcCal.set(year, month, day)
+
+        return utcCal.timeInMillis
     }
 
     Column(
@@ -473,6 +503,18 @@ fun ApplicationForm(
             }
         }
 
+        OutlinedTextField(
+            value = uiState.notes,
+            onValueChange = onNotesChange,
+            label = { Text("Remarks") },
+            placeholder = { Text("E.g. recruiter name, follow-up reminder") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(150.dp),
+            enabled = !uiState.isSaving,
+            maxLines = 6
+        )
+
         Spacer(modifier = Modifier.height(16.dp))
 
         // Save Button
@@ -503,7 +545,12 @@ fun ApplicationForm(
     // Date Picker Dialog
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = uiState.applicationDate
+            initialSelectedDateMillis = uiState.applicationDate,
+            selectableDates = object : SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long): Boolean {
+                    return utcTimeMillis <= endOfTodayMillis()
+                }
+            }
         )
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
@@ -530,7 +577,10 @@ fun ApplicationForm(
     }
 
     if (showInterviewDatePicker) {
-        val initialDate = uiState.interviewScheduledAt ?: System.currentTimeMillis()
+        val initialDate = uiState.interviewScheduledAt
+            ?.let { localDateTimeMillisToUtcDateMillis(it) }
+            ?: System.currentTimeMillis()
+
         val datePickerState = rememberDatePickerState(
             initialSelectedDateMillis = initialDate,
             selectableDates = object : SelectableDates {

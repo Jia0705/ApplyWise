@@ -20,7 +20,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            ApplyWiseTheme {
+//            ApplyWiseTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -30,7 +30,7 @@ class MainActivity : ComponentActivity() {
                         navController = navController
                     )
                 }
-            }
+//            }
         }
     }
 }
