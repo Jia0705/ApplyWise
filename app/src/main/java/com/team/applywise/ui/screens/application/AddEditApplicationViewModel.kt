@@ -49,6 +49,7 @@ class AddEditApplicationViewModel @Inject constructor(
                             status = it.status,
                             applicationDate = it.applicationDate,
                             interviewScheduledAt = it.interviewScheduledAt,
+                            notes = it.notes,
                             createdAt = it.createdAt,
                             originalStatus = it.status,
                             statusHistory = it.statusHistory
@@ -90,6 +91,10 @@ class AddEditApplicationViewModel @Inject constructor(
 
     fun onInterviewScheduledAtChange(value: Long) {
         _uiState.update { it.copy(interviewScheduledAt = value, interviewScheduledAtError = null) }
+    }
+
+    fun onNotesChange(value: String) {
+        _uiState.update { it.copy(notes = value) }
     }
 
     fun saveApplication() {
@@ -157,6 +162,7 @@ class AddEditApplicationViewModel @Inject constructor(
                         status = _uiState.value.status,
                         applicationDate = _uiState.value.applicationDate,
                         interviewScheduledAt = _uiState.value.interviewScheduledAt,
+                        notes = _uiState.value.notes,
                         createdAt = _uiState.value.createdAt,
                         updatedAt = now,
                         statusHistory = updatedHistory
@@ -177,6 +183,7 @@ class AddEditApplicationViewModel @Inject constructor(
                         status = _uiState.value.status,
                         applicationDate = _uiState.value.applicationDate,
                         interviewScheduledAt = _uiState.value.interviewScheduledAt,
+                        notes = _uiState.value.notes,
                         statusHistory = listOf(StatusChange(_uiState.value.status, initialTimestamp))
                     )
                     applicationRepo.createApplication(application)
@@ -204,6 +211,7 @@ data class ApplicationFormUiState(
     val status: ApplicationStatus = ApplicationStatus.APPLIED,
     val applicationDate: Long = System.currentTimeMillis(),
     val interviewScheduledAt: Long? = null,
+    val notes: String = "",
     val createdAt: Long = System.currentTimeMillis(),
     val originalStatus: ApplicationStatus = ApplicationStatus.APPLIED,
     val statusHistory: List<StatusChange> = emptyList(),
