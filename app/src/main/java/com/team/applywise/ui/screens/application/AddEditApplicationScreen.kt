@@ -325,7 +325,7 @@ fun ApplicationForm(
         return cal.get(Calendar.HOUR_OF_DAY) to cal.get(Calendar.MINUTE)
     }
 
-    fun localDateTimeMillisToUtcDateMillis(localMillis: Long): Long {
+    fun localDateMillisToUtcDateMillis(localMillis: Long): Long {
         val cal = Calendar.getInstance()
         cal.timeInMillis = localMillis
 
@@ -338,6 +338,21 @@ fun ApplicationForm(
         utcCal.set(year, month, day)
 
         return utcCal.timeInMillis
+    }
+
+    fun utcDateMillisToLocalDateMillis(utcMillis: Long): Long {
+        val utcCal = Calendar.getInstance(getTimeZone("UTC"))
+        utcCal.timeInMillis = utcMillis
+
+        val year = utcCal.get(Calendar.YEAR)
+        val month = utcCal.get(Calendar.MONTH)
+        val day = utcCal.get(Calendar.DAY_OF_MONTH)
+
+        val localCal = Calendar.getInstance()
+        localCal.clear()
+        localCal.set(year, month, day)
+
+        return localCal.timeInMillis
     }
 
     Column(
@@ -545,7 +560,7 @@ fun ApplicationForm(
     // Date Picker Dialog
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = uiState.applicationDate,
+            initialSelectedDateMillis = localDateMillisToUtcDateMillis(uiState.applicationDate),
             selectableDates = object : SelectableDates {
                 override fun isSelectableDate(utcTimeMillis: Long): Boolean {
                     return utcTimeMillis <= endOfTodayMillis()
@@ -557,8 +572,8 @@ fun ApplicationForm(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        datePickerState.selectedDateMillis?.let {
-                            onApplicationDateChange(it)
+                        datePickerState.selectedDateMillis?.let { utcMillis ->
+                            onApplicationDateChange(utcDateMillisToLocalDateMillis(utcMillis))
                         }
                         showDatePicker = false
                     }
@@ -578,7 +593,7 @@ fun ApplicationForm(
 
     if (showInterviewDatePicker) {
         val initialDate = uiState.interviewScheduledAt
-            ?.let { localDateTimeMillisToUtcDateMillis(it) }
+            ?.let { localDateMillisToUtcDateMillis(it) }
             ?: System.currentTimeMillis()
 
         val datePickerState = rememberDatePickerState(
@@ -598,7 +613,8 @@ fun ApplicationForm(
                         if (selectedDate != null) {
                             val baseTime = uiState.interviewScheduledAt ?: System.currentTimeMillis()
                             val (hour, minute) = hourMinuteFromMillis(baseTime)
-                            onInterviewScheduledAtChange(combineDateAndTime(selectedDate, hour, minute))
+                            val localDateMillis = utcDateMillisToLocalDateMillis(selectedDate)
+                            onInterviewScheduledAtChange(combineDateAndTime(localDateMillis, hour, minute))
                         }
                         showInterviewDatePicker = false
                     }
