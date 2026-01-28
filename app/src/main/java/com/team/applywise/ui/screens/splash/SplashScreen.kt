@@ -25,14 +25,19 @@ import kotlinx.coroutines.delay
 
 @Composable
 fun SplashScreen(
-    navController: NavController
+    navController: NavController,
+    pendingApplicationId: String? = null
 ) {
     val viewModel: SplashViewModel = hiltViewModel()
 
     LaunchedEffect(Unit) {
         delay(1200)
         val destination = viewModel.determineStartDestination()
-        navigate(navController, destination)
+        if (destination == Screen.Dashboard && !pendingApplicationId.isNullOrBlank()) {
+            navigate(navController, Screen.ApplicationDetail(pendingApplicationId))
+        } else {
+            navigate(navController, destination)
+        }
     }
 
     Box(

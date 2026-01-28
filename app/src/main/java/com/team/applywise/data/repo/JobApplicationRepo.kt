@@ -5,7 +5,7 @@ import com.team.applywise.data.model.JobApplication
 import kotlinx.coroutines.flow.Flow
 
 interface JobApplicationRepo {
-    suspend fun createApplication(application: JobApplication)
+    suspend fun createApplication(application: JobApplication): String
     fun getApplicationsByUser(userId: String): Flow<List<JobApplication>>
     suspend fun getApplicationById(id: String): JobApplication?
     suspend fun updateApplication(application: JobApplication)

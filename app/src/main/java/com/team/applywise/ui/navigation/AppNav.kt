@@ -37,7 +37,8 @@ import com.team.applywise.ui.screens.splash.SplashScreen
 
 @Composable
 fun AppNav(
-    navController: NavHostController
+    navController: NavHostController,
+    pendingApplicationId: String? = null
 ) {
     val navigateToApplicationList: () -> Unit = {
         navController.navigate(Screen.ApplicationList()) {
@@ -80,7 +81,10 @@ fun AppNav(
                 startDestination = Screen.Splash
             ) {
                 composable<Screen.Splash> {
-                    SplashScreen(navController)
+                    SplashScreen(
+                        navController = navController,
+                        pendingApplicationId = pendingApplicationId
+                    )
                 }
 
                 composable<Screen.Login> {

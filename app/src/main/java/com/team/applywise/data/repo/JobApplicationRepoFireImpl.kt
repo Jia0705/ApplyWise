@@ -16,7 +16,7 @@ class JobApplicationRepoFireImpl @Inject constructor(
 ): JobApplicationRepo {
     private val applicationsCollection = firestore.collection("applications")
 
-    override suspend fun createApplication(application: JobApplication) {
+    override suspend fun createApplication(application: JobApplication): String {
         val docRef = applicationsCollection.document()
         val newApplication = application.copy(
             id = docRef.id,
@@ -24,6 +24,7 @@ class JobApplicationRepoFireImpl @Inject constructor(
             updatedAt = System.currentTimeMillis()
         )
         docRef.set(newApplication.toMap()).await()
+        return docRef.id
     }
 
     override fun getApplicationsByUser(userId: String): Flow<List<JobApplication>> = callbackFlow {

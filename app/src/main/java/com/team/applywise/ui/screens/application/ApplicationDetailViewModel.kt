@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.team.applywise.data.model.JobApplication
 import com.team.applywise.data.repo.JobApplicationRepo
+import com.team.applywise.service.AlarmScheduler
 import com.team.applywise.service.AuthService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,6 +18,7 @@ import javax.inject.Inject
 class ApplicationDetailViewModel @Inject constructor(
     private val authService: AuthService,
     private val applicationRepo: JobApplicationRepo,
+    private val alarmScheduler: AlarmScheduler,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -58,6 +60,7 @@ class ApplicationDetailViewModel @Inject constructor(
             try {
                 _uiState.update { it.copy(isDeleting = true) }
                 applicationRepo.deleteApplication(applicationId)
+                alarmScheduler.cancelInterviewReminder(applicationId)
                 _uiState.update { it.copy(isDeleting = false, deleteSuccess = true) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(isDeleting = false, error = e.message) }

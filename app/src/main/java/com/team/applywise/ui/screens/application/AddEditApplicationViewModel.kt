@@ -7,6 +7,7 @@ import com.team.applywise.data.model.ApplicationStatus
 import com.team.applywise.data.model.JobApplication
 import com.team.applywise.data.model.StatusChange
 import com.team.applywise.data.repo.JobApplicationRepo
+import com.team.applywise.service.AlarmScheduler
 import com.team.applywise.service.AuthService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,6 +20,7 @@ import javax.inject.Inject
 class AddEditApplicationViewModel @Inject constructor(
     private val authService: AuthService,
     private val applicationRepo: JobApplicationRepo,
+    private val alarmScheduler: AlarmScheduler,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -168,6 +170,7 @@ class AddEditApplicationViewModel @Inject constructor(
                         statusHistory = updatedHistory
                     )
                     applicationRepo.updateApplication(application)
+                    updateInterviewReminder(application)
                     _uiState.update { it.copy(isSaving = false, saveSuccess = true) }
                 } else {
                     val initialTimestamp = if (_uiState.value.status == ApplicationStatus.APPLIED) {
@@ -186,7 +189,8 @@ class AddEditApplicationViewModel @Inject constructor(
                         notes = _uiState.value.notes,
                         statusHistory = listOf(StatusChange(_uiState.value.status, initialTimestamp))
                     )
-                    applicationRepo.createApplication(application)
+                    val newId = applicationRepo.createApplication(application)
+                    updateInterviewReminder(application.copy(id = newId))
                     _uiState.update { it.copy(isSaving = false, saveSuccess = true) }
                 }
             } catch (e: Exception) {
@@ -197,6 +201,22 @@ class AddEditApplicationViewModel @Inject constructor(
 
     fun clearError() {
         _uiState.update { it.copy(error = null) }
+    }
+
+    private fun updateInterviewReminder(application: JobApplication) {
+        if (application.id.isBlank()) return
+        val interviewAt = application.interviewScheduledAt
+        if (application.status == ApplicationStatus.INTERVIEW_SCHEDULED && interviewAt != null) {
+            alarmScheduler.cancelInterviewReminder(application.id)
+            alarmScheduler.scheduleInterviewReminder(
+                applicationId = application.id,
+                companyName = application.companyName,
+                jobTitle = application.jobTitle,
+                interviewAtMillis = interviewAt
+            )
+        } else {
+            alarmScheduler.cancelInterviewReminder(application.id)
+        }
     }
 }
 
