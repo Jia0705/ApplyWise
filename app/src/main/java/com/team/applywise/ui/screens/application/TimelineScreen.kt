@@ -47,7 +47,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.team.applywise.data.model.ApplicationStatus
 import com.team.applywise.data.model.StatusChange
 import androidx.compose.material3.TopAppBar
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.material3.SnackbarHost
 import com.team.applywise.ui.components.NetworkStatusBanner
 import com.team.applywise.core.utils.Utils
