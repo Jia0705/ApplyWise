@@ -14,6 +14,11 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/**
+ * ViewModel for Application Detail screen
+ * Shows full details of one application and allows deleting it
+ * Gets the application ID from navigation arguments
+ */
 @HiltViewModel
 class ApplicationDetailViewModel @Inject constructor(
     private val authService: AuthService,
@@ -22,19 +27,26 @@ class ApplicationDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
+    // Get application ID from navigation (passed when user clicks on an application)
     private val applicationId: String = savedStateHandle.get<String>("applicationId") ?: ""
 
     private val _uiState = MutableStateFlow(ApplicationDetailUiState())
     val uiState = _uiState.asStateFlow()
 
     init {
+        // Load data as soon as ViewModel is created
         loadApplication()
     }
 
+    /**
+     * Load application details from Firestore
+     * This is a one-time fetch (not real-time like the list screen)
+     */
     private fun loadApplication() {
         viewModelScope.launch {
             try {
                 _uiState.update { it.copy(isLoading = true) }
+                // Fetch from Firestore
                 val application = applicationRepo.getApplicationById(applicationId)
                 _uiState.update {
                     it.copy(
@@ -51,16 +63,26 @@ class ApplicationDetailViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Reload application (used after editing to refresh data)
+     */
     fun reload() {
         loadApplication()
     }
 
+    /**
+     * Delete application permanently
+     * Also cancels any interview reminder notification
+     */
     fun deleteApplication() {
         viewModelScope.launch {
             try {
                 _uiState.update { it.copy(isDeleting = true) }
+                // Delete from Firestore
                 applicationRepo.deleteApplication(applicationId)
+                // Cancel notification alarm (if any)
                 alarmScheduler.cancelInterviewReminder(applicationId)
+                // Tell screen: delete successful, navigate back
                 _uiState.update { it.copy(isDeleting = false, deleteSuccess = true) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(isDeleting = false, error = e.message) }

@@ -1,6 +1,5 @@
 package com.team.applywise.ui.screens.application
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,8 +10,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -21,10 +18,10 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Work
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
@@ -32,15 +29,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -48,26 +44,46 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.team.applywise.data.model.ApplicationStatus
-import com.team.applywise.data.model.JobApplication
-import com.team.applywise.ui.components.ApplicationStatusBadge
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import com.team.applywise.ui.components.JobApplicationCard
+import com.team.applywise.ui.components.EmptyApplicationState
+import com.team.applywise.ui.components.NetworkStatusBanner
+import com.team.applywise.core.utils.ConnectivityObserver
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.SnackbarHost
 
+/**
+ * ApplicationListScreen - Shows all job applications with search and filter
+ * 
+ * Features:
+ * 1. Search bar - Search by company name or job title
+ * 2. Filter chips - Filter by status (Applied, Interview, Offer, etc.)
+ * 3. List of applications - Shows company, job, status, dates
+ * 4. FAB (+ button) - Quick add new application
+ * 5. Click application -> navigate to detail
+ * 
+ * Real-time updates: When applications are added/edited in Firestore,
+ * this list automatically updates (thanks to Flow in ViewModel)
+ */
 // Application List screen with search and filter
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ApplicationListScreen(
-    onNavigateToDetail: (String) -> Unit,
-    onNavigateToAdd: () -> Unit,
-    onNavigateBack: () -> Unit,
-    initialFilter: String? = null,
+    onNavigateToDetail: (String) -> Unit, // Navigate to application detail
+    onNavigateToAdd: () -> Unit, // Navigate to add new application
+    onNavigateBack: () -> Unit, // Back button
+    initialFilter: String? = null, // Initial filter (if navigated from Dashboard stat)
     viewModel: ApplicationListViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val selectedFilter by viewModel.selectedFilter.collectAsStateWithLifecycle()
+    val selectedSort by viewModel.selectedSort.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    var showSortMenu by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val connectivityObserver = remember { ConnectivityObserver(context) }
+    val isOnline by connectivityObserver.observe().collectAsStateWithLifecycle(initialValue = true)
 
     LaunchedEffect(initialFilter) {
         viewModel.onFilterSelected(initialFilter)
@@ -81,50 +97,79 @@ fun ApplicationListScreen(
         }
     }
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
             TopAppBar(
-                title = { Text("Applications") },
+                title = { Text("Applications", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 }
             )
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = onNavigateToAdd,
-                containerColor = MaterialTheme.colorScheme.primary
+            NetworkStatusBanner(isOffline = !isOnline)
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Add Application")
-            }
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            // Search bar
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = viewModel::onSearchQueryChange,
+            // Search bar and Sort button in a Row
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
-                placeholder = { Text("Search by company or job title") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { viewModel.onSearchQueryChange("") }) {
-                            Icon(Icons.Default.Clear, contentDescription = "Clear search")
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Search field (takes most space)
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = viewModel::onSearchQueryChange,
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text("Search company or job") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { viewModel.onSearchQueryChange("") }) {
+                                Icon(Icons.Default.Clear, contentDescription = "Clear")
+                            }
+                        }
+                    },
+                    singleLine = true
+                )
+                
+                // Sort button with dropdown
+                Box {
+                    IconButton(
+                        onClick = { showSortMenu = true }
+                    ) {
+                        Icon(
+                            Icons.Default.Sort,
+                            contentDescription = "Sort",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    
+                    DropdownMenu(
+                        expanded = showSortMenu,
+                        onDismissRequest = { showSortMenu = false }
+                    ) {
+                        SortOption.entries.forEach { sortOption ->
+                            DropdownMenuItem(
+                                text = { 
+                                    Text(
+                                        sortOption.displayName,
+                                        fontWeight = if (selectedSort == sortOption) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                },
+                                onClick = {
+                                    viewModel.onSortSelected(sortOption)
+                                    showSortMenu = false
+                                }
+                            )
                         }
                     }
-                },
-                singleLine = true
-            )
+                }
+            }
 
             // Filter chips
             LazyRow(
@@ -159,7 +204,7 @@ fun ApplicationListScreen(
                     CircularProgressIndicator()
                 }
             } else if (uiState.applications.isEmpty()) {
-                EmptyApplicationList(
+                EmptyApplicationState(
                     message = if (searchQuery.isNotEmpty() || selectedFilter != null) {
                         "No applications found"
                     } else {
@@ -174,99 +219,26 @@ fun ApplicationListScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(uiState.applications) { application ->
-                        ApplicationListItem(
+                        JobApplicationCard(
                             application = application,
                             onClick = { onNavigateToDetail(application.id) }
                         )
                     }
                 }
-            }
+            } }
         }
-    }
-}
-
-@Composable
-fun ApplicationListItem(
-    application: JobApplication,
-    onClick: () -> Unit
-) {
-    val dateFormat = remember { SimpleDateFormat("MMM dd, yyyy hh:mm a", Locale.getDefault()) }
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-    ) {
-        Column(
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
+        FloatingActionButton(
+            onClick = onNavigateToAdd,
+            containerColor = MaterialTheme.colorScheme.primary,
             modifier = Modifier
-                .fillMaxWidth()
+                .align(Alignment.BottomEnd)
                 .padding(16.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = application.jobTitle,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = application.companyName,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                ApplicationStatusBadge(status = application.status)
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Applied: ${dateFormat.format(Date(application.applicationDate))}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = "Updated: ${dateFormat.format(Date(application.updatedAt))}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-fun EmptyApplicationList(
-    message: String,
-    onAddClick: () -> Unit
-) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(32.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Work,
-                contentDescription = null,
-                modifier = Modifier.size(64.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = onAddClick) {
-                Icon(Icons.Default.Add, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Add Application")
-            }
+            Icon(Icons.Default.Add, contentDescription = "Add Application")
         }
     }
 }

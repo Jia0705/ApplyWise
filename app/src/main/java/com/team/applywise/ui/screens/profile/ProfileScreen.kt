@@ -24,13 +24,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -48,27 +44,51 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.team.applywise.ui.components.Avatar
+import com.team.applywise.ui.components.NetworkStatusBanner
+import com.team.applywise.core.utils.ConnectivityObserver
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.SnackbarHost
 
+/**
+ * ProfileScreen - Shows user's profile information
+ * 
+ * Displays:
+ * - Avatar (first letter of name in colored circle)
+ * - Name
+ * - Email
+ * 
+ * Actions:
+ * - Edit button -> navigate to edit profile
+ * - Logout button -> show confirmation, then sign out and navigate to login
+ * 
+ * Refreshes data when returning from edit screen
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
-    onEditProfile: () -> Unit,
-    showUpdateMessage: Boolean,
-    onMessageShown: () -> Unit,
-    onLogout: () -> Unit,
+    onEditProfile: () -> Unit, // Navigate to edit profile
+    showUpdateMessage: Boolean, // Show "Profile updated" message after edit
+    onMessageShown: () -> Unit, // Clear the update message
+    onLogout: () -> Unit, // Navigate to login after logout
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    var showLogoutDialog by remember { mutableStateOf(false) }
+    var showLogoutDialog by remember { mutableStateOf(false) } // "Are you sure you want to logout?" dialog
     val lifecycleOwner = LocalLifecycleOwner.current
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
+    val connectivityObserver = remember { ConnectivityObserver(context) }
+    val isOnline by connectivityObserver.observe().collectAsStateWithLifecycle(initialValue = true)
 
+    // When logout succeeds, navigate to login
     LaunchedEffect(uiState.logoutSuccess) {
         if (uiState.logoutSuccess) {
             onLogout()
         }
     }
 
+    // Show "Profile updated" message when returning from edit
     LaunchedEffect(showUpdateMessage) {
         if (showUpdateMessage) {
             snackbarHostState.showSnackbar("Profile updated")
@@ -88,24 +108,22 @@ fun ProfileScreen(
         }
     }
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
             TopAppBar(
-                title = { Text("Profile") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+                title = {
+                    Text(
+                        "Profile",
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             )
-        }
-    ) { padding ->
-        Column(
+            NetworkStatusBanner(isOffline = !isOnline)
+            Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Card(
@@ -131,18 +149,18 @@ fun ProfileScreen(
                             .padding(top = 8.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                    Avatar(
-                        name = uiState.name.ifBlank { "User" },
-                        modifier = Modifier.size(80.dp),
-                        colorName = uiState.avatarColor.ifBlank { null }
-                    )
+                        Avatar(
+                            name = uiState.name.ifBlank { "User" },
+                            modifier = Modifier.size(80.dp),
+                            colorName = uiState.avatarColor.ifBlank { null }
+                        )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                        text = uiState.name.ifBlank { "User" },
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
+                            text = uiState.name.ifBlank { "User" },
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = uiState.email,
@@ -193,7 +211,11 @@ fun ProfileScreen(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Logout")
             }
-        }
+        } }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
 
     if (showLogoutDialog) {

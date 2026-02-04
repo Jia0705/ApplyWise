@@ -34,13 +34,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.material3.SelectableDates
@@ -52,46 +51,68 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.team.applywise.data.model.ApplicationStatus
 import com.team.applywise.ui.components.DiscardChangesDialog
-import java.text.SimpleDateFormat
+import com.team.applywise.ui.components.NetworkStatusBanner
+import com.team.applywise.core.utils.Utils
+import com.team.applywise.core.utils.ConnectivityObserver
+import androidx.compose.ui.platform.LocalContext
 import java.util.Calendar
-import java.util.Date
-import java.util.Locale
 import java.util.TimeZone.getTimeZone
 
+/**
+ * AddApplicationScreen - Form to create a new job application
+ * 
+ * User fills in:
+ * - Company name (required)
+ * - Job title (required)
+ * - Status (Applied, Interview Scheduled, etc.)
+ * - Application date
+ * - Interview date/time (only if status = Interview Scheduled)
+ * - Notes (optional)
+ * 
+ * When saved:
+ * - Creates new application in Firestore
+ * - If interview scheduled, sets up reminder notification (30 min before)
+ * - Navigates back to list
+ */
 // Add Application
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddApplicationScreen(
     navController: NavController,
     onNavigateBack: () -> Unit,
-    onApplicationAdded: () -> Unit,
+    onApplicationAdded: () -> Unit, // Called after successful save
     viewModel: AddEditApplicationViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
-    var showDiscardDialog by remember { mutableStateOf(false) }
-    var initialState by remember { mutableStateOf<ApplicationFormUiState?>(null) }
+    var showDiscardDialog by remember { mutableStateOf(false) } // "Discard changes?" dialog
+    var initialState by remember { mutableStateOf<ApplicationFormUiState?>(null) } // Track if user made changes
+    val context = LocalContext.current
+    val connectivityObserver = remember { ConnectivityObserver(context) }
+    val isOnline by connectivityObserver.observe().collectAsStateWithLifecycle(initialValue = true)
 
+    // Remember initial state to detect if user made changes
     LaunchedEffect(uiState.isLoading) {
         if (!uiState.isLoading && initialState == null) {
             initialState = uiState
         }
     }
 
-    // Handle save success
+    // When save succeeds, navigate back
     LaunchedEffect(uiState.saveSuccess) {
         if (uiState.saveSuccess) {
             onApplicationAdded()
         }
     }
 
-    // Show error messages
+    // Show error messages in Snackbar
     LaunchedEffect(uiState.error) {
         uiState.error?.let {
             snackbarHostState.showSnackbar(it)
@@ -116,37 +137,38 @@ fun AddApplicationScreen(
         }
     }
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
             TopAppBar(
-                title = { Text("Add Application") },
+                title = { Text("Add Application", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(
-                        onClick = {
-                            if (hasChanges) {
-                                showDiscardDialog = true
-                            } else {
-                                navController.popBackStack()
-                            }
+                    IconButton(onClick = {
+                        if (hasChanges) {
+                            showDiscardDialog = true
+                        } else {
+                            navController.popBackStack()
                         }
-                    ) {
+                    }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 }
             )
+            NetworkStatusBanner(isOffline = !isOnline)
+            ApplicationForm(
+                modifier = Modifier,
+                uiState = uiState,
+                onCompanyNameChange = viewModel::onCompanyNameChange,
+                onJobTitleChange = viewModel::onJobTitleChange,
+                onStatusChange = viewModel::onStatusChange,
+                onApplicationDateChange = viewModel::onApplicationDateChange,
+                onInterviewScheduledAtChange = viewModel::onInterviewScheduledAtChange,
+                onNotesChange = viewModel::onNotesChange,
+                onSaveClick = viewModel::saveApplication
+            )
         }
-    ) { padding ->
-        ApplicationForm(
-            modifier = Modifier.padding(padding),
-            uiState = uiState,
-            onCompanyNameChange = viewModel::onCompanyNameChange,
-            onJobTitleChange = viewModel::onJobTitleChange,
-            onStatusChange = viewModel::onStatusChange,
-            onApplicationDateChange = viewModel::onApplicationDateChange,
-            onInterviewScheduledAtChange = viewModel::onInterviewScheduledAtChange,
-            onNotesChange = viewModel::onNotesChange,
-            onSaveClick = viewModel::saveApplication
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
         )
     }
 
@@ -161,20 +183,33 @@ fun AddApplicationScreen(
     }
 }
 
+/**
+ * EditApplicationScreen - Edit an existing job application
+ * 
+ * Similar to AddApplicationScreen but:
+ * - Loads existing data from Firestore
+ * - Saves updates instead of creating new
+ * - Updates interview reminder if interview date changed
+ * 
+ * Same validation rules apply
+ */
 // Edit Application
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditApplicationScreen(
     navController: NavController,
-    applicationId: String,
+    applicationId: String, // ID of application to edit
     onNavigateBack: () -> Unit,
-    onApplicationUpdated: () -> Unit,
+    onApplicationUpdated: () -> Unit, // Called after successful update
     viewModel: AddEditApplicationViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var showDiscardDialog by remember { mutableStateOf(false) }
     var initialState by remember { mutableStateOf<ApplicationFormUiState?>(null) }
+    val context = LocalContext.current
+    val connectivityObserver = remember { ConnectivityObserver(context) }
+    val isOnline by connectivityObserver.observe().collectAsStateWithLifecycle(initialValue = true)
 
     LaunchedEffect(uiState.isLoading) {
         if (!uiState.isLoading && initialState == null) {
@@ -182,14 +217,14 @@ fun EditApplicationScreen(
         }
     }
 
-    // Handle save success
+    // When update succeeds, navigate back
     LaunchedEffect(uiState.saveSuccess) {
         if (uiState.saveSuccess) {
             onApplicationUpdated()
         }
     }
 
-    // Show error messages
+    // Show error messages in Snackbar
     LaunchedEffect(uiState.error) {
         uiState.error?.let {
             snackbarHostState.showSnackbar(it)
@@ -214,49 +249,48 @@ fun EditApplicationScreen(
         }
     }
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
             TopAppBar(
-                title = { Text("Edit Application") },
+                title = { Text("Edit Application", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(
-                        onClick = {
-                            if (hasChanges) {
-                                showDiscardDialog = true
-                            } else {
-                                navController.popBackStack()
-                            }
+                    IconButton(onClick = {
+                        if (hasChanges) {
+                            showDiscardDialog = true
+                        } else {
+                            navController.popBackStack()
                         }
-                    ) {
+                    }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 }
             )
-        }
-    ) { padding ->
-        if (uiState.isLoading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
+            NetworkStatusBanner(isOffline = !isOnline)
+            if (uiState.isLoading) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            } else {
+                ApplicationForm(
+                    modifier = Modifier,
+                    uiState = uiState,
+                    onCompanyNameChange = viewModel::onCompanyNameChange,
+                    onJobTitleChange = viewModel::onJobTitleChange,
+                    onStatusChange = viewModel::onStatusChange,
+                    onApplicationDateChange = viewModel::onApplicationDateChange,
+                    onInterviewScheduledAtChange = viewModel::onInterviewScheduledAtChange,
+                    onNotesChange = viewModel::onNotesChange,
+                    onSaveClick = viewModel::saveApplication
+                )
             }
-        } else {
-            ApplicationForm(
-                modifier = Modifier.padding(padding),
-                uiState = uiState,
-                onCompanyNameChange = viewModel::onCompanyNameChange,
-                onJobTitleChange = viewModel::onJobTitleChange,
-                onStatusChange = viewModel::onStatusChange,
-                onApplicationDateChange = viewModel::onApplicationDateChange,
-                onInterviewScheduledAtChange = viewModel::onInterviewScheduledAtChange,
-                onNotesChange = viewModel::onNotesChange,
-                onSaveClick = viewModel::saveApplication
-            )
         }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
 
     if (showDiscardDialog) {
@@ -288,8 +322,6 @@ fun ApplicationForm(
     var showInterviewDatePicker by remember { mutableStateOf(false) }
     var showInterviewTimePicker by remember { mutableStateOf(false) }
     var showStatusDropdown by remember { mutableStateOf(false) }
-    val dateFormat = remember { SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()) }
-    val timeFormat = remember { SimpleDateFormat("hh:mm a", Locale.getDefault()) }
 
     fun startOfTodayMillis(): Long {
         val cal = Calendar.getInstance()
@@ -394,7 +426,7 @@ fun ApplicationForm(
 
         // Application Date
         OutlinedTextField(
-            value = dateFormat.format(Date(uiState.applicationDate)),
+            value = Utils.formatDate(uiState.applicationDate),
             onValueChange = {},
             label = { Text("Application Date") },
             leadingIcon = { Icon(Icons.Default.CalendarToday, contentDescription = null) },
@@ -453,7 +485,7 @@ fun ApplicationForm(
                     .clickable { showInterviewDatePicker = true }
             ) {
                 OutlinedTextField(
-                    value = interviewMillis?.let { dateFormat.format(Date(it)) } ?: "",
+                    value = interviewMillis?.let { Utils.formatDate(it) } ?: "",
                     onValueChange = {},
                     label = { Text("Interview Date *") },
                     leadingIcon = { Icon(Icons.Default.CalendarToday, contentDescription = null) },
@@ -499,7 +531,7 @@ fun ApplicationForm(
                     .clickable { showInterviewTimePicker =  true}
             ) {
                 OutlinedTextField(
-                    value = interviewMillis?.let { timeFormat.format(Date(it)) } ?: "",
+                    value = interviewMillis?.let { Utils.formatTime(it) } ?: "",
                     onValueChange = {},
                     label = { Text("Interview Time *") },
                     leadingIcon = { Icon(Icons.Default.Info, contentDescription = null) },

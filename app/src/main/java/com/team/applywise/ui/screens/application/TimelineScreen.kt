@@ -30,12 +30,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -49,21 +46,44 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.team.applywise.data.model.ApplicationStatus
 import com.team.applywise.data.model.StatusChange
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import androidx.compose.material3.TopAppBar
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.material3.SnackbarHost
+import com.team.applywise.ui.components.NetworkStatusBanner
+import com.team.applywise.core.utils.Utils
+import com.team.applywise.core.utils.ConnectivityObserver
+import androidx.compose.ui.platform.LocalContext
 
+/**
+ * TimelineScreen - Shows history of status changes for an application
+ * 
+ * Displays:
+ * - Timeline of all status changes
+ * - Each change shows: status name, icon, and timestamp
+ * - Example:
+ *   • Applied - Feb 01, 2026
+ *   • Interview Scheduled - Feb 05, 2026
+ *   • Offer Received - Feb 10, 2026
+ * 
+ * Shows in chronological order (oldest first)
+ * If no status history exists, shows message
+ * 
+ * This helps user see the progression of their application
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TimelineScreen(
-    applicationId: String,
+    applicationId: String, // ID of application to show timeline for
     onNavigateBack: () -> Unit,
-    viewModel: ApplicationDetailViewModel = hiltViewModel()
+    viewModel: ApplicationDetailViewModel = hiltViewModel() // Reuses same ViewModel as detail screen
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
+    val connectivityObserver = remember { ConnectivityObserver(context) }
+    val isOnline by connectivityObserver.observe().collectAsStateWithLifecycle(initialValue = true)
 
-    // Show error messages
+    // Show error messages in Snackbar
     LaunchedEffect(uiState.error) {
         uiState.error?.let {
             snackbarHostState.showSnackbar(it)
@@ -71,33 +91,26 @@ fun TimelineScreen(
         }
     }
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
             TopAppBar(
-                title = { Text("Timeline") },
+                title = { Text("Timeline", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 }
             )
-        }
-    ) { padding ->
-        if (uiState.isLoading) {
+            NetworkStatusBanner(isOffline = !isOnline)
+            if (uiState.isLoading) {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
+                modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
                 CircularProgressIndicator()
             }
         } else {
             uiState.application?.let { application ->
-                val dateFormat = remember { SimpleDateFormat("MMM dd, yyyy 'at' hh:mm a", Locale.getDefault()) }
-                
-                // Generate timeline events
                 val events = remember(application) {
                     val statusHistory = application.statusHistory.ifEmpty {
                         listOf(StatusChange(ApplicationStatus.APPLIED, application.applicationDate))
@@ -186,7 +199,7 @@ fun TimelineScreen(
                             add(
                                 TimelineEvent(
                                     title = "Interview Scheduled For",
-                                    description = "Scheduled for: ${dateFormat.format(Date(interviewTime))}",
+                                    description = "Scheduled for: ${Utils.formatTimelineDate(interviewTime)}",
                                     timestamp = interviewStatusChange ?: application.updatedAt,
                                     icon = Icons.Default.Event
                                 )
@@ -196,9 +209,7 @@ fun TimelineScreen(
                 }
 
                 LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding),
+                    modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(16.dp)
                 ) {
                     item {
@@ -237,13 +248,16 @@ fun TimelineScreen(
                     items(events) { event ->
                         TimelineEventItem(
                             event = event,
-                            dateFormat = dateFormat,
                             isLast = event == events.last()
                         )
                     }
                 }
             }
-        }
+        } }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
 }
 
@@ -257,7 +271,6 @@ data class TimelineEvent(
 @Composable
 fun TimelineEventItem(
     event: TimelineEvent,
-    dateFormat: SimpleDateFormat,
     isLast: Boolean
 ) {
     Row(
@@ -314,7 +327,7 @@ fun TimelineEventItem(
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = dateFormat.format(Date(event.timestamp)),
+                text = Utils.formatTimelineDate(event.timestamp),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

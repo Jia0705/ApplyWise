@@ -14,39 +14,52 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/**
+ * ViewModel for Dashboard screen
+ * This calculates statistics from all applications and shows recent applications
+ * It counts how many applications are in each status (Applied, Interview, Offer, etc.)
+ */
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
     private val authService: AuthService,
     private val applicationRepo: JobApplicationRepo
 ) : ViewModel() {
 
+    // Holds all the dashboard data (counts, recent applications, etc.)
     private val _uiState = MutableStateFlow(DashboardUiState())
     val uiState = _uiState.asStateFlow()
 
     init {
+        // Load data as soon as ViewModel is created
         loadDashboardData()
     }
 
     private fun loadDashboardData() {
+        // Get current user ID - if no user logged in, exit early
         val userId = authService.getCurrentUser()?.uid ?: return
 
-        // Load applications for recent list and counts
+        // Load all applications and calculate statistics
         viewModelScope.launch {
             applicationRepo.getApplicationsByUser(userId)
                 .catch { e ->
+                    // If loading fails, show error message
                     _uiState.update {
                         it.copy(isLoading = false, error = "Failed to load applications: ${e.message}")
                     }
                 }
                 .collect { applications ->
+                    // Count how many applications are in each status
+                    // Example: If user has 3 "Interview Scheduled" and 2 "Applied", counts will be {INTERVIEW_SCHEDULED: 3, APPLIED: 2, ...}
                     val counts = ApplicationStatus.entries.associateWith { status ->
                         applications.count { it.status == status }
                     }
+                    
+                    // Update the screen with new data
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            recentApplications = applications.take(5),
-                            totalApplications = counts.values.sum(),
+                            recentApplications = applications.take(5), // Show only first 5 applications
+                            totalApplications = counts.values.sum(), // Add all counts together
                             interviewScheduledCount = counts[ApplicationStatus.INTERVIEW_SCHEDULED] ?: 0,
                             interviewCompletedCount = counts[ApplicationStatus.INTERVIEW_COMPLETED] ?: 0,
                             offersCount = counts[ApplicationStatus.OFFER_RECEIVED] ?: 0,
@@ -59,11 +72,6 @@ class DashboardViewModel @Inject constructor(
                 }
         }
     }
-
-//    fun refresh() {
-//        _uiState.update { it.copy(isLoading = true, error = null) }
-//        loadDashboardData()
-//    }
 
     fun clearError() {
         _uiState.update { it.copy(error = null) }

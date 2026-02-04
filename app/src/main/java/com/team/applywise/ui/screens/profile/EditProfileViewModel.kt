@@ -2,6 +2,7 @@ package com.team.applywise.ui.screens.profile
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.team.applywise.core.utils.Utils
 import com.team.applywise.data.repo.UserRepo
 import com.team.applywise.service.AuthService
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -11,6 +12,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/**
+ * ViewModel for Edit Profile screen
+ * Allows user to change their name and avatar color
+ * Saves to both Firebase Auth (display name) and Firestore (full profile)
+ */
 @HiltViewModel
 class EditProfileViewModel @Inject constructor(
     private val authService: AuthService,
@@ -25,6 +31,7 @@ class EditProfileViewModel @Inject constructor(
     }
 
     private fun loadUserInfo() {
+        // Get user from Firebase Auth first
         val authUser = authService.getCurrentUser()
         if (authUser == null) {
             _uiState.update {
@@ -37,6 +44,7 @@ class EditProfileViewModel @Inject constructor(
             return
         }
 
+        // Show auth data immediately while we load from Firestore
         _uiState.update {
             it.copy(
                 nameInput = authUser.name,
@@ -45,6 +53,7 @@ class EditProfileViewModel @Inject constructor(
             )
         }
 
+        // Load full data from Firestore
         viewModelScope.launch {
             val user = userRepo.getUser(authUser.uid)
             _uiState.update {
@@ -69,21 +78,33 @@ class EditProfileViewModel @Inject constructor(
     fun saveProfile() {
         val authUser = authService.getCurrentUser() ?: return
         val trimmedName = _uiState.value.nameInput.trim()
-        if (trimmedName.isBlank()) {
-            _uiState.update { it.copy(error = "Name cannot be empty") }
+        
+        // Step 1: Validate name (cannot be empty)
+        val validationError = Utils.validateName(trimmedName)
+        if (validationError != null) {
+            _uiState.update { it.copy(error = validationError) }
             return
         }
 
+        // Step 2: Save to both places
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true, error = null, saveSuccess = false) }
             try {
+                // Save to Firestore (always works)
                 userRepo.updateUserProfile(authUser.uid, trimmedName, _uiState.value.avatarColor)
+                
+                // Try to update Firebase Auth display name (might fail but that's OK)
                 try {
                     authService.updateDisplayName(trimmedName)
                 } catch (_: Exception) {
-                    // Keep Firestore update even if auth profile update fails
+                    // Keep going even if Firebase Auth update fails
+                    // Firestore is more important and already updated
                 }
+                
+                // Update avatar color in local memory (not stored in Firebase Auth)
                 authService.updateAvatarColor(_uiState.value.avatarColor)
+                
+                // Tell screen: save successful!
                 _uiState.update { it.copy(isSaving = false, saveSuccess = true) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(isSaving = false, error = "Failed to save profile") }

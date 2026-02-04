@@ -23,19 +23,35 @@ import androidx.navigation.NavController
 import com.team.applywise.ui.navigation.Screen
 import kotlinx.coroutines.delay
 
+/**
+ * SplashScreen - First screen shown when app opens
+ * Shows app logo for 1.2 seconds while checking if user is logged in
+ * 
+ * Flow:
+ * 1. Show "ApplyWise" logo and loading spinner
+ * 2. Wait 1200ms (1.2 seconds)
+ * 3. Check if user is logged in (via ViewModel)
+ * 4. If logged in -> go to Dashboard
+ * 5. If not logged in -> go to Login screen
+ * 6. Special case: If opened from notification, go directly to that application detail
+ */
 @Composable
 fun SplashScreen(
     navController: NavController,
-    pendingApplicationId: String? = null
+    pendingApplicationId: String? = null // Non-null if opened from notification
 ) {
     val viewModel: SplashViewModel = hiltViewModel()
 
+    // This runs once when screen is created
     LaunchedEffect(Unit) {
-        delay(1200)
-        val destination = viewModel.determineStartDestination()
+        delay(1200) // Show splash for 1.2 seconds
+        val destination = viewModel.determineStartDestination() // Check if logged in
+        
+        // If user is logged in AND opened from notification, go to that application
         if (destination == Screen.Dashboard && !pendingApplicationId.isNullOrBlank()) {
             navigate(navController, Screen.ApplicationDetail(pendingApplicationId))
         } else {
+            // Otherwise, go to Dashboard or Login depending on login status
             navigate(navController, destination)
         }
     }
