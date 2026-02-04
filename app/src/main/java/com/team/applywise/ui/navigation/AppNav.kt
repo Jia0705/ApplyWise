@@ -60,7 +60,9 @@ fun AppNav(
                         }
                     },
                     onNavigateToRegister = {
-                        navController.navigate(Screen.Register)
+                        navController.navigate(Screen.Register) {
+                            launchSingleTop = true
+                        }
                     }
                 )
             }
@@ -73,7 +75,10 @@ fun AppNav(
                         }
                     },
                     onNavigateToLogin = {
-                        navController.popBackStack()
+                        navController.navigate(Screen.Login) {
+                            popUpTo<Screen.Login> { inclusive = true }
+                            launchSingleTop = true
+                        }
                     }
                 )
             }
