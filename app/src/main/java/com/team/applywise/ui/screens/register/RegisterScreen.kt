@@ -40,20 +40,30 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 
+/**
+ * RegisterScreen - Create new account with email/password
+ * 
+ * Flow:
+ * 1. User fills in: name, email, password, confirm password
+ * 2. Click "Sign Up" -> calls viewModel.register()
+ * 3. If validation passes and registration succeeds, navigate to Dashboard
+ * 4. If error (email exists, weak password, etc.), show toast
+ */
 @Composable
 fun RegisterScreen(
-    onRegisterSuccess: () -> Unit,
-    onNavigateToLogin: () -> Unit,
+    onRegisterSuccess: () -> Unit, // Navigate to Dashboard after successful registration
+    onNavigateToLogin: () -> Unit, // User clicks "Already have an account? Login"
     viewModel: RegisterViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
 
+    // Input fields
     var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
-    var showPassword by remember { mutableStateOf(false) }
-    var showConfirmPassword by remember { mutableStateOf(false) }
+    var showPassword by remember { mutableStateOf(false) } // Toggle password visibility
+    var showConfirmPassword by remember { mutableStateOf(false) } // Toggle confirm password visibility
 
     fun showToast(msg: String) {
         Toast.makeText(context, msg, Toast.LENGTH_LONG).show()

@@ -9,6 +9,7 @@ import com.team.applywise.data.model.StatusChange
 import com.team.applywise.data.repo.JobApplicationRepo
 import com.team.applywise.service.AlarmScheduler
 import com.team.applywise.service.AuthService
+import com.team.applywise.core.utils.Utils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,6 +17,11 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/**
+ * ViewModel for Add/Edit Application screen
+ * This handles both creating new applications and editing existing ones
+ * Same screen, different modes depending on whether we receive an applicationId
+ */
 @HiltViewModel
 class AddEditApplicationViewModel @Inject constructor(
     private val authService: AuthService,
@@ -24,14 +30,17 @@ class AddEditApplicationViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
+    // If we get an ID from navigation, we're in edit mode. Otherwise, we're adding new.
     private val applicationId: String? = savedStateHandle.get<String>("applicationId")
     
     private val _uiState = MutableStateFlow(ApplicationFormUiState())
     val uiState = _uiState.asStateFlow()
 
+    // Check which mode we're in
     val isEditMode: Boolean get() = applicationId != null
 
     init {
+        // If editing, load the existing application data
         if (applicationId != null) {
             loadApplication(applicationId)
         }
@@ -73,6 +82,8 @@ class AddEditApplicationViewModel @Inject constructor(
     }
 
     fun onStatusChange(value: ApplicationStatus) {
+        // If user selects "Interview Scheduled", keep the interview date they set
+        // If they select anything else (like "Rejected"), clear the interview date (not needed anymore)
         val clearedInterviewDate = if (value == ApplicationStatus.INTERVIEW_SCHEDULED) {
             _uiState.value.interviewScheduledAt
         } else {
@@ -100,16 +111,12 @@ class AddEditApplicationViewModel @Inject constructor(
     }
 
     fun saveApplication() {
-        // Validate
-        val companyNameError = if (_uiState.value.companyName.isBlank()) {
-            "Company name is required"
-        } else null
-
-        val jobTitleError = if (_uiState.value.jobTitle.isBlank()) {
-            "Job title is required"
-        } else null
+        // Step 1: Validate company name and job title (cannot be empty)
+        val companyNameError = Utils.validateCompanyName(_uiState.value.companyName)
+        val jobTitleError = Utils.validateJobTitle(_uiState.value.jobTitle)
 
         if (companyNameError != null || jobTitleError != null) {
+            // Show error messages under the text fields
             _uiState.update {
                 it.copy(
                     companyNameError = companyNameError,
@@ -119,13 +126,9 @@ class AddEditApplicationViewModel @Inject constructor(
             return
         }
 
+        // Step 2: If status is "Interview Scheduled", make sure interview date is set and in the future
         val interviewError = if (_uiState.value.status == ApplicationStatus.INTERVIEW_SCHEDULED) {
-            val interviewTime = _uiState.value.interviewScheduledAt
-            when {
-                interviewTime == null -> "Interview date and time are required"
-                interviewTime < System.currentTimeMillis() -> "Interview date/time cannot be in the past"
-                else -> null
-            }
+            Utils.validateInterviewTime(_uiState.value.interviewScheduledAt)
         } else {
             null
         }
@@ -142,7 +145,12 @@ class AddEditApplicationViewModel @Inject constructor(
             try {
                 val now = System.currentTimeMillis()
                 if (isEditMode && applicationId != null) {
+                    // We're editing an existing application
+                    
+                    // Build status history - track when status changed
+                    // Example: Applied (Jan 1) → Interview (Jan 5) → Offer (Jan 10)
                     val existingHistory = _uiState.value.statusHistory.ifEmpty {
+                        // If history is empty (old data), create first entry with original status
                         listOf(
                             StatusChange(
                                 _uiState.value.originalStatus,
@@ -150,12 +158,13 @@ class AddEditApplicationViewModel @Inject constructor(
                             )
                         )
                     }
+                    // If user changed status, add new entry to history
                     val updatedHistory = if (_uiState.value.status != _uiState.value.originalStatus) {
                         existingHistory + StatusChange(_uiState.value.status, now)
                     } else {
                         existingHistory
                     }
-                    // Update application
+                    // Update the application in Firestore
                     val application = JobApplication(
                         id = applicationId,
                         userId = userId,
@@ -170,15 +179,19 @@ class AddEditApplicationViewModel @Inject constructor(
                         statusHistory = updatedHistory
                     )
                     applicationRepo.updateApplication(application)
+                    // Update the notification reminder (if interview scheduled)
                     updateInterviewReminder(application)
                     _uiState.update { it.copy(isSaving = false, saveSuccess = true) }
                 } else {
+                    // We're creating a new application
+                    
+                    // For status history, use application date if status is "Applied", otherwise use current time
                     val initialTimestamp = if (_uiState.value.status == ApplicationStatus.APPLIED) {
                         _uiState.value.applicationDate
                     } else {
                         now
                     }
-                    // Create new application
+                    // Create the new application
                     val application = JobApplication(
                         userId = userId,
                         companyName = _uiState.value.companyName,
@@ -190,6 +203,7 @@ class AddEditApplicationViewModel @Inject constructor(
                         statusHistory = listOf(StatusChange(_uiState.value.status, initialTimestamp))
                     )
                     val newId = applicationRepo.createApplication(application)
+                    // Schedule notification for the new application
                     updateInterviewReminder(application.copy(id = newId))
                     _uiState.update { it.copy(isSaving = false, saveSuccess = true) }
                 }
@@ -203,6 +217,11 @@ class AddEditApplicationViewModel @Inject constructor(
         _uiState.update { it.copy(error = null) }
     }
 
+    /**
+     * Sets up or cancels interview reminder notification
+     * If status is "Interview Scheduled" and date is set: create alarm (30 min before interview)
+     * If status changed to something else: cancel the alarm
+     */
     private fun updateInterviewReminder(application: JobApplication) {
         if (application.id.isBlank()) return
         val interviewAt = application.interviewScheduledAt

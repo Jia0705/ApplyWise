@@ -22,13 +22,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -51,18 +47,41 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.navigation.NavController
 import com.team.applywise.ui.components.DiscardChangesDialog
+import com.team.applywise.ui.components.NetworkStatusBanner
+import com.team.applywise.core.utils.ConnectivityObserver
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.SnackbarHost
 
+/**
+ * EditProfileScreen - Edit user's name and avatar color
+ * 
+ * User can:
+ * - Change display name
+ * - Choose avatar color (Red, Blue, Green, Orange, Magenta)
+ * 
+ * Changes are saved to:
+ * 1. Firestore (always)
+ * 2. Firebase Auth display name (if possible)
+ * 3. Local memory for avatar color
+ * 
+ * Shows "Discard changes?" dialog if user backs out with unsaved changes
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditProfileScreen(
     navController: NavController,
     onNavigateBack: () -> Unit,
-    onSaveSuccess: () -> Unit,
+    onSaveSuccess: () -> Unit, // Called after successful save -> navigate back
     viewModel: EditProfileViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
-    val showColorPicker = remember { mutableStateOf(false) }
+    val showColorPicker = remember { mutableStateOf(false) } // Show color picker dialog
+    val context = LocalContext.current
+    val connectivityObserver = remember { ConnectivityObserver(context) }
+    val isOnline by connectivityObserver.observe().collectAsStateWithLifecycle(initialValue = true)
+    // Available colors for avatar
     val colorOptions = listOf(
         "red" to Color.Red,
         "magenta" to Color.Magenta,
@@ -70,8 +89,8 @@ fun EditProfileScreen(
         "green" to Color.Green,
         "blue" to Color.Blue
     )
-    var showDiscardDialog by remember { mutableStateOf(false) }
-    var initialState by remember { mutableStateOf<EditProfileUiState?>(null) }
+    var showDiscardDialog by remember { mutableStateOf(false) } // "Discard changes?" dialog
+    var initialState by remember { mutableStateOf<EditProfileUiState?>(null) } // Track if user made changes
 
     LaunchedEffect(uiState.isLoading) {
         if (!uiState.isLoading && initialState == null) {
@@ -105,37 +124,28 @@ fun EditProfileScreen(
         }
     }
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
             TopAppBar(
-                title = { Text("Edit Profile") },
+                title = { Text("Edit Profile", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(
-                        onClick = {
-                            if (hasChanges) {
-                                showDiscardDialog = true
-                            } else {
-                                navController.popBackStack()
-                            }
+                    IconButton(onClick = {
+                        if (hasChanges) {
+                            showDiscardDialog = true
+                        } else {
+                            navController.popBackStack()
                         }
-                    ) {
+                    }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+                }
             )
-        }
-    ) { padding ->
-        Column(
+            NetworkStatusBanner(isOffline = !isOnline)
+            Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Card(
@@ -205,7 +215,11 @@ fun EditProfileScreen(
             ) {
                 Text("Save Changes")
             }
-        }
+        } }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
 
     if (showColorPicker.value) {

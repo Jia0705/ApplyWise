@@ -41,17 +41,30 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 
+/**
+ * LoginScreen - First screen user sees (after splash)
+ * Allows login with email/password or Google Sign-In
+ * 
+ * How it works:
+ * 1. User enters email and password
+ * 2. Click "Login" -> calls viewModel.login()
+ * 3. If success, navigate to Dashboard
+ * 4. If error, show toast message
+ * 5. Or click "Sign in with Google" for Google login
+ */
 @Composable
 fun LoginScreen(
-    onLoginSuccess: () -> Unit,
-    onNavigateToRegister: () -> Unit,
+    onLoginSuccess: () -> Unit, // Called when login succeeds -> navigate to Dashboard
+    onNavigateToRegister: () -> Unit, // Called when user clicks "Sign Up"
     viewModel: LoginViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
+    // Input fields
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var showPassword by remember { mutableStateOf(false) }
+    var showPassword by remember { mutableStateOf(false) } // Toggle password visibility
 
+    // Helper to show error messages
     fun showToast(msg: String) {
         Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
     }

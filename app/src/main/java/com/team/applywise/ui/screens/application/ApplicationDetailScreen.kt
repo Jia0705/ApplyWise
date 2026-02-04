@@ -34,12 +34,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -57,25 +54,49 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.SnackbarHost
 import com.team.applywise.ui.components.ApplicationStatusBadge
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import com.team.applywise.ui.components.NetworkStatusBanner
+import com.team.applywise.core.utils.Utils
+import com.team.applywise.core.utils.ConnectivityObserver
+import androidx.compose.ui.platform.LocalContext
 
+/**
+ * ApplicationDetailScreen - Shows full details of one application
+ * 
+ * Displays:
+ * - Company name and job title
+ * - Current status badge
+ * - Application date
+ * - Interview date/time (if scheduled)
+ * - Notes
+ * - Created and last updated timestamps
+ * 
+ * Actions:
+ * - Edit button -> navigate to edit screen
+ * - Delete button -> show confirmation dialog, then delete
+ * - Timeline button -> show status change history
+ * 
+ * Automatically reloads data when returning from edit screen
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ApplicationDetailScreen(
-    applicationId: String,
+    applicationId: String, // ID of application to display
     onNavigateBack: () -> Unit,
-    onNavigateToEdit: (String) -> Unit,
-    onNavigateToTimeline: (String) -> Unit,
-    onApplicationDeleted: () -> Unit,
+    onNavigateToEdit: (String) -> Unit, // Navigate to edit this application
+    onNavigateToTimeline: (String) -> Unit, // Navigate to timeline of this application
+    onApplicationDeleted: () -> Unit, // Called after successful deletion
     viewModel: ApplicationDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
-    var showDeleteDialog by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) } // "Delete this application?" dialog
     val lifecycleOwner = LocalLifecycleOwner.current
+    val context = LocalContext.current
+    val connectivityObserver = remember { ConnectivityObserver(context) }
+    val isOnline by connectivityObserver.observe().collectAsStateWithLifecycle(initialValue = true)
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -104,11 +125,10 @@ fun ApplicationDetailScreen(
         }
     }
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
             TopAppBar(
-                title = { Text("Application Details") },
+                title = { Text("Application Details", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
@@ -123,27 +143,19 @@ fun ApplicationDetailScreen(
                     }
                 }
             )
-        }
-    ) { padding ->
-        if (uiState.isLoading) {
+            NetworkStatusBanner(isOffline = !isOnline)
+            if (uiState.isLoading) {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
+                modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
                 CircularProgressIndicator()
             }
         } else {
             uiState.application?.let { application ->
-                val dateFormat = remember { SimpleDateFormat("MMMM dd, yyyy hh:mm a", Locale.getDefault()) }
-                val interviewDateFormat = remember { SimpleDateFormat("EEE, MMM dd, yyyy", Locale.getDefault()) }
-                val interviewTimeFormat = remember { SimpleDateFormat("hh:mm a", Locale.getDefault()) }
-
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(padding)
                         .padding(16.dp)
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(24.dp)
@@ -194,7 +206,7 @@ fun ApplicationDetailScreen(
                             DetailRow(
                                 icon = Icons.Default.CalendarToday,
                                 label = "Application Date",
-                                value = dateFormat.format(Date(application.applicationDate))
+                                value = Utils.formatFullDateTime(application.applicationDate)
                             )
 
                             application.interviewScheduledAt?.let { interviewTime ->
@@ -242,7 +254,7 @@ fun ApplicationDetailScreen(
                                                     color = MaterialTheme.colorScheme.onErrorContainer
                                                 )
                                                 Text(
-                                                    text = interviewDateFormat.format(Date(interviewTime)),
+                                                    text = Utils.formatDateWithDay(interviewTime),
                                                     style = MaterialTheme.typography.bodyMedium,
                                                     color = MaterialTheme.colorScheme.onErrorContainer
                                                 )
@@ -257,7 +269,7 @@ fun ApplicationDetailScreen(
                                             )
                                         ) {
                                             Text(
-                                                text = interviewTimeFormat.format(Date(interviewTime)),
+                                                text = Utils.formatTime(interviewTime),
                                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                                                 style = MaterialTheme.typography.labelLarge,
                                                 fontWeight = FontWeight.Bold,
@@ -326,13 +338,13 @@ fun ApplicationDetailScreen(
                             DetailRow(
                                 icon = Icons.Default.Create,
                                 label = "Created",
-                                value = dateFormat.format(Date(application.createdAt))
+                                value = Utils.formatFullDateTime(application.createdAt)
                             )
 
                             DetailRow(
                                 icon = Icons.Default.Update,
                                 label = "Last Updated",
-                                value = dateFormat.format(Date(application.updatedAt))
+                                value = Utils.formatFullDateTime(application.updatedAt)
                             )
                         }
                     }
@@ -366,7 +378,11 @@ fun ApplicationDetailScreen(
                     }
                 }
             }
-        }
+        } }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
 
     // Delete Confirmation Dialog

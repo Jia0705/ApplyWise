@@ -13,6 +13,10 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/**
+ * ViewModel for Registration screen
+ * This handles creating a new user account with email/password
+ */
 @HiltViewModel
 class RegisterViewModel @Inject constructor(
     private val authService: AuthService,
@@ -26,17 +30,24 @@ class RegisterViewModel @Inject constructor(
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
-        val validationError = validateCredentials(name, email, password, confirmPassword)
+        // Step 1: Check if all fields are valid (name not empty, email format correct, passwords match, etc.)
+        val validationError = Utils.validateRegisterCredentials(name, email, password, confirmPassword)
         if (validationError != null) {
             onError(validationError)
             return
         }
 
+        // Step 2: Create the account in Firebase (runs in background)
         viewModelScope.launch {
             try {
+                // Register with Firebase Authentication - creates the account
                 authService.registerWithEmail(name, email, password)
+                
+                // Step 3: Get the newly created user info
                 val user = authService.getCurrentUser()
                 if (user != null) {
+                    // Save user details to Firestore database
+                    // We save to Firestore because Firebase Auth only stores email/password
                     userRepo.createUser(
                         User(
                             uid = user.uid,
@@ -45,27 +56,21 @@ class RegisterViewModel @Inject constructor(
                         )
                     )
                 }
+                // Step 4: Tell the screen everything worked - navigate to dashboard
                 onSuccess()
             } catch (e: FirebaseAuthWeakPasswordException) {
+                // Password is too simple (Firebase requires at least 6 characters)
                 onError("Password is too weak")
             } catch (e: FirebaseAuthUserCollisionException) {
+                // Someone already registered with this email
                 onError("Email already exists")
             } catch (e: FirebaseNetworkException) {
+                // No internet connection
                 onError("Network error. Check your connection")
             } catch (e: Exception) {
+                // Something else went wrong
                 onError("Something went wrong. Please try again")
             }
         }
-    }
-
-    private fun validateCredentials(name: String, email: String, password: String, confirmPassword: String): String? {
-        if (name.isBlank()) return "Name is required"
-        if (email.isBlank()) return "Email is required"
-        if (!Utils.isValidEmail(email)) return "Invalid email format"
-        if (password.isBlank()) return "Password is required"
-        if (password.length < 6) return "Password must be at least 6 characters"
-        if (confirmPassword.isBlank()) return "Confirm password is required"
-        if (password != confirmPassword) return "Passwords do not match"
-        return null
     }
 }
