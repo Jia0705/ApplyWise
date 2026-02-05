@@ -49,8 +49,8 @@ import com.team.applywise.ui.components.EmptyApplicationState
 import com.team.applywise.ui.components.NetworkStatusBanner
 import com.team.applywise.core.utils.ConnectivityObserver
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.SnackbarHost
+import androidx.compose.ui.unit.sp
 
 /**
  * ApplicationListScreen - Shows all job applications with search and filter
@@ -99,14 +99,25 @@ fun ApplicationListScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            TopAppBar(
-                title = { Text("Applications", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
+            // Custom header with back button and title
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onNavigateBack) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                 }
-            )
+                
+                Text(
+                    text = "Applications",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            }
+            
             NetworkStatusBanner(isOffline = !isOnline)
             Column(
                 modifier = Modifier
@@ -215,7 +226,12 @@ fun ApplicationListScreen(
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
+                    contentPadding = PaddingValues(
+                        start = 16.dp,
+                        top = 16.dp,
+                        end = 16.dp,
+                        bottom = 96.dp
+                    ),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(uiState.applications) { application ->

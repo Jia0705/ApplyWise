@@ -50,8 +50,8 @@ import com.team.applywise.ui.components.DiscardChangesDialog
 import com.team.applywise.ui.components.NetworkStatusBanner
 import com.team.applywise.core.utils.ConnectivityObserver
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.SnackbarHost
+import androidx.compose.ui.unit.sp
 
 /**
  * EditProfileScreen - Edit user's name and avatar color
@@ -126,20 +126,31 @@ fun EditProfileScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            TopAppBar(
-                title = { Text("Edit Profile", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = {
-                        if (hasChanges) {
-                            showDiscardDialog = true
-                        } else {
-                            navController.popBackStack()
-                        }
-                    }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+            // Custom header with back button and title
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = {
+                    if (hasChanges) {
+                        showDiscardDialog = true
+                    } else {
+                        navController.popBackStack()
                     }
+                }) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                 }
-            )
+                
+                Text(
+                    text = "Edit Profile",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            }
+            
             NetworkStatusBanner(isOffline = !isOnline)
             Column(
             modifier = Modifier

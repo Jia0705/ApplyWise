@@ -1,6 +1,5 @@
-package com.team.applywise.ui.screens.application
+package com.team.applywise.ui.components
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,7 +13,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Info
@@ -30,284 +28,43 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults.TrailingIcon
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
-import androidx.compose.material3.SelectableDates
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavController
-import com.team.applywise.data.model.ApplicationStatus
-import com.team.applywise.ui.components.DiscardChangesDialog
-import com.team.applywise.ui.components.NetworkStatusBanner
 import com.team.applywise.core.utils.Utils
-import com.team.applywise.core.utils.ConnectivityObserver
-import androidx.compose.ui.platform.LocalContext
+import com.team.applywise.data.model.ApplicationStatus
+import com.team.applywise.ui.screens.application.ApplicationFormUiState
 import java.util.Calendar
 import java.util.TimeZone.getTimeZone
 
 /**
- * AddApplicationScreen - Form to create a new job application
+ * ApplicationFormFields - Reusable form component for Add/Edit Application screens
  * 
- * User fills in:
- * - Company name (required)
- * - Job title (required)
- * - Status (Applied, Interview Scheduled, etc.)
+ * Contains all form fields:
+ * - Company name
+ * - Job title
  * - Application date
- * - Interview date/time (only if status = Interview Scheduled)
- * - Notes (optional)
- * 
- * When saved:
- * - Creates new application in Firestore
- * - If interview scheduled, sets up reminder notification (30 min before)
- * - Navigates back to list
+ * - Status dropdown
+ * - Interview date/time (conditional)
+ * - Notes
+ * - Save button
  */
-// Add Application
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddApplicationScreen(
-    navController: NavController,
-    onNavigateBack: () -> Unit,
-    onApplicationAdded: () -> Unit, // Called after successful save
-    viewModel: AddEditApplicationViewModel = hiltViewModel()
-) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val snackbarHostState = remember { SnackbarHostState() }
-    var showDiscardDialog by remember { mutableStateOf(false) } // "Discard changes?" dialog
-    var initialState by remember { mutableStateOf<ApplicationFormUiState?>(null) } // Track if user made changes
-    val context = LocalContext.current
-    val connectivityObserver = remember { ConnectivityObserver(context) }
-    val isOnline by connectivityObserver.observe().collectAsStateWithLifecycle(initialValue = true)
-
-    // Remember initial state to detect if user made changes
-    LaunchedEffect(uiState.isLoading) {
-        if (!uiState.isLoading && initialState == null) {
-            initialState = uiState
-        }
-    }
-
-    // When save succeeds, navigate back
-    LaunchedEffect(uiState.saveSuccess) {
-        if (uiState.saveSuccess) {
-            onApplicationAdded()
-        }
-    }
-
-    // Show error messages in Snackbar
-    LaunchedEffect(uiState.error) {
-        uiState.error?.let {
-            snackbarHostState.showSnackbar(it)
-            viewModel.clearError()
-        }
-    }
-
-    val hasChanges = initialState?.let {
-        uiState.companyName != it.companyName ||
-                uiState.jobTitle != it.jobTitle ||
-                uiState.status != it.status ||
-                uiState.applicationDate != it.applicationDate ||
-                uiState.interviewScheduledAt != it.interviewScheduledAt ||
-                uiState.notes != it.notes
-    } ?: false
-
-    BackHandler {
-        if (hasChanges) {
-            showDiscardDialog = true
-        } else {
-            navController.popBackStack()
-        }
-    }
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            TopAppBar(
-                title = { Text("Add Application", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = {
-                        if (hasChanges) {
-                            showDiscardDialog = true
-                        } else {
-                            navController.popBackStack()
-                        }
-                    }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                }
-            )
-            NetworkStatusBanner(isOffline = !isOnline)
-            ApplicationForm(
-                modifier = Modifier,
-                uiState = uiState,
-                onCompanyNameChange = viewModel::onCompanyNameChange,
-                onJobTitleChange = viewModel::onJobTitleChange,
-                onStatusChange = viewModel::onStatusChange,
-                onApplicationDateChange = viewModel::onApplicationDateChange,
-                onInterviewScheduledAtChange = viewModel::onInterviewScheduledAtChange,
-                onNotesChange = viewModel::onNotesChange,
-                onSaveClick = viewModel::saveApplication
-            )
-        }
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier.align(Alignment.BottomCenter)
-        )
-    }
-
-    if (showDiscardDialog) {
-        DiscardChangesDialog(
-            onDiscard = {
-                showDiscardDialog = false
-                navController.popBackStack()
-            },
-            onDismiss = { showDiscardDialog = false }
-        )
-    }
-}
-
-/**
- * EditApplicationScreen - Edit an existing job application
- * 
- * Similar to AddApplicationScreen but:
- * - Loads existing data from Firestore
- * - Saves updates instead of creating new
- * - Updates interview reminder if interview date changed
- * 
- * Same validation rules apply
- */
-// Edit Application
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun EditApplicationScreen(
-    navController: NavController,
-    applicationId: String, // ID of application to edit
-    onNavigateBack: () -> Unit,
-    onApplicationUpdated: () -> Unit, // Called after successful update
-    viewModel: AddEditApplicationViewModel = hiltViewModel()
-) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val snackbarHostState = remember { SnackbarHostState() }
-    var showDiscardDialog by remember { mutableStateOf(false) }
-    var initialState by remember { mutableStateOf<ApplicationFormUiState?>(null) }
-    val context = LocalContext.current
-    val connectivityObserver = remember { ConnectivityObserver(context) }
-    val isOnline by connectivityObserver.observe().collectAsStateWithLifecycle(initialValue = true)
-
-    LaunchedEffect(uiState.isLoading) {
-        if (!uiState.isLoading && initialState == null) {
-            initialState = uiState
-        }
-    }
-
-    // When update succeeds, navigate back
-    LaunchedEffect(uiState.saveSuccess) {
-        if (uiState.saveSuccess) {
-            onApplicationUpdated()
-        }
-    }
-
-    // Show error messages in Snackbar
-    LaunchedEffect(uiState.error) {
-        uiState.error?.let {
-            snackbarHostState.showSnackbar(it)
-            viewModel.clearError()
-        }
-    }
-
-    val hasChanges = initialState?.let {
-        uiState.companyName != it.companyName ||
-                uiState.jobTitle != it.jobTitle ||
-                uiState.status != it.status ||
-                uiState.applicationDate != it.applicationDate ||
-                uiState.interviewScheduledAt != it.interviewScheduledAt ||
-                uiState.notes != it.notes
-    } ?: false
-
-    BackHandler {
-        if (hasChanges) {
-            showDiscardDialog = true
-        } else {
-            navController.popBackStack()
-        }
-    }
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            TopAppBar(
-                title = { Text("Edit Application", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = {
-                        if (hasChanges) {
-                            showDiscardDialog = true
-                        } else {
-                            navController.popBackStack()
-                        }
-                    }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                }
-            )
-            NetworkStatusBanner(isOffline = !isOnline)
-            if (uiState.isLoading) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
-            } else {
-                ApplicationForm(
-                    modifier = Modifier,
-                    uiState = uiState,
-                    onCompanyNameChange = viewModel::onCompanyNameChange,
-                    onJobTitleChange = viewModel::onJobTitleChange,
-                    onStatusChange = viewModel::onStatusChange,
-                    onApplicationDateChange = viewModel::onApplicationDateChange,
-                    onInterviewScheduledAtChange = viewModel::onInterviewScheduledAtChange,
-                    onNotesChange = viewModel::onNotesChange,
-                    onSaveClick = viewModel::saveApplication
-                )
-            }
-        }
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier.align(Alignment.BottomCenter)
-        )
-    }
-
-    if (showDiscardDialog) {
-        DiscardChangesDialog(
-            onDiscard = {
-                showDiscardDialog = false
-                navController.popBackStack()
-            },
-            onDismiss = { showDiscardDialog = false }
-        )
-    }
-}
-
-// Reusable form component
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun ApplicationForm(
+fun ApplicationFormFields(
     modifier: Modifier = Modifier,
     uiState: ApplicationFormUiState,
     onCompanyNameChange: (String) -> Unit,
@@ -528,7 +285,7 @@ fun ApplicationForm(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clickable { showInterviewTimePicker =  true}
+                    .clickable { showInterviewTimePicker = true }
             ) {
                 OutlinedTextField(
                     value = interviewMillis?.let { Utils.formatTime(it) } ?: "",
@@ -563,6 +320,7 @@ fun ApplicationForm(
         )
 
         Spacer(modifier = Modifier.height(16.dp))
+//        Spacer(modifier = Modifier.weight(1f))
 
         // Save Button
         Button(
@@ -672,7 +430,7 @@ fun ApplicationForm(
             initialMinute = initialMinute,
             is24Hour = false
         )
-       AlertDialog(
+        AlertDialog(
             onDismissRequest = { showInterviewTimePicker = false },
             confirmButton = {
                 TextButton(

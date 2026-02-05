@@ -3,6 +3,7 @@ package com.team.applywise.ui.screens.profile
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -47,8 +48,8 @@ import com.team.applywise.ui.components.Avatar
 import com.team.applywise.ui.components.NetworkStatusBanner
 import com.team.applywise.core.utils.ConnectivityObserver
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.SnackbarHost
+import androidx.compose.ui.unit.sp
 
 /**
  * ProfileScreen - Shows user's profile information
@@ -110,14 +111,20 @@ fun ProfileScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            TopAppBar(
-                title = {
-                    Text(
-                        "Profile",
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            )
+            // Custom header with title
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 20.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Profile",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp
+                )
+            }
+            
             NetworkStatusBanner(isOffline = !isOnline)
             Column(
             modifier = Modifier
@@ -197,6 +204,8 @@ fun ProfileScreen(
                     )
                 }
             }
+
+//                Spacer(modifier = Modifier.weight(1f))
 
             Button(
                 onClick = { showLogoutDialog = true },

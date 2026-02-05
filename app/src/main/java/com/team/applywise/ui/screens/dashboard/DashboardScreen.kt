@@ -46,7 +46,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.team.applywise.data.model.ApplicationStatus
-import androidx.compose.material3.TopAppBar
 import androidx.compose.foundation.layout.Column
 import com.team.applywise.ui.components.JobApplicationCard
 import com.team.applywise.ui.components.EmptyApplicationState
@@ -58,6 +57,7 @@ import kotlin.math.sin
 import android.graphics.Paint
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.sp
 import java.lang.Math.toRadians
 
 /**
@@ -95,9 +95,20 @@ fun DashboardScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            TopAppBar(
-                title = { Text("Dashboard", fontWeight = FontWeight.Bold) }
-            )
+            // Custom header with title
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 20.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Dashboard",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp
+                )
+            }
+            
             NetworkStatusBanner(isOffline = !isOnline)
         
         if (uiState.isLoading && uiState.recentApplications.isEmpty()) {
@@ -110,9 +121,15 @@ fun DashboardScreen(
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    top = 16.dp,
+                    end = 16.dp,
+                    bottom = 96.dp
+                ),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
+            )
+ {
                 item {
                     StatusPieCard(
                         statusCounts = uiState.statusCounts,
@@ -395,41 +412,88 @@ fun StatusPieCard(
 
 @Composable
 fun PieChart(
-    segments: List<PieSegment>,
-    size: Dp
+    segments: List<PieSegment>, // List of pie slices (value + color)
+    size: Dp // Size of the pie chart
 ) {
+
+    // Sum of all segment values (used to calculate percentages)
     val total = segments.sumOf { it.value }
+
+    // Canvas lets us draw custom shapes
     Canvas(
         modifier = Modifier.size(size)
     ) {
+
+        // If total is zero or negative, do not draw anything
         if (total <= 0) return@Canvas
+
+        // Start from top (12 o'clock position)
         var startAngle = -90f
+
+        // Radius of the pie (half of width/height)
         val radius = size.toPx() / 2f
+
+        // Paint used to draw percentage text
         val labelPaint = Paint().apply {
-            textSize = radius * 0.16f
-            isAntiAlias = true
+            textSize = radius * 0.16f // text size relative to pie size
+            isAntiAlias = true        // smooth text
             textAlign = Paint.Align.CENTER
         }
+
+        // Loop through each pie segment
         segments.forEach { segment ->
+
+            // Calculate how big this slice should be (in degrees)
             val sweep = (segment.value.toFloat() / total.toFloat()) * 360f
+
+            // Draw the pie slice
             drawArc(
-                color = segment.color,
-                startAngle = startAngle,
-                sweepAngle = sweep,
-                useCenter = true,
+                color = segment.color,   // slice color
+                startAngle = startAngle, // where slice starts
+                sweepAngle = sweep,      // how large the slice is
+                useCenter = true,        // draw from center (pie style)
                 size = Size(size.toPx(), size.toPx())
             )
+
+            // Only draw percentage text if slice is big enough
             if (sweep >= 12f) {
+
+                // Angle in the middle of the slice
                 val midAngle = startAngle + (sweep / 2f)
-                val percent = (segment.value.toFloat() / total.toFloat()) * 100f
+
+                // Calculate percentage value
+                val percent =
+                    (segment.value.toFloat() / total.toFloat()) * 100f
+
+                // Convert percentage to text (e.g. "25%")
                 val label = "${percent.toInt()}%"
+
+                // Text color
                 labelPaint.color = android.graphics.Color.BLACK
+
+                // Convert angle to radians (for sin & cos)
                 val angleRad = toRadians(midAngle.toDouble())
+
+                // Distance of label from center
                 val labelRadius = radius * 0.6f
-                val x = (radius + (labelRadius * cos(angleRad))).toFloat()
-                val y = (radius + (labelRadius * sin(angleRad))).toFloat()
-                drawContext.canvas.nativeCanvas.drawText(label, x, y, labelPaint)
+
+                // X position of text
+                val x =
+                    (radius + (labelRadius * cos(angleRad))).toFloat()
+
+                // Y position of text
+                val y =
+                    (radius + (labelRadius * sin(angleRad))).toFloat()
+
+                // Draw percentage text inside slice
+                drawContext.canvas.nativeCanvas.drawText(
+                    label,
+                    x,
+                    y,
+                    labelPaint
+                )
             }
+            // Move startAngle forward for next slice
             startAngle += sweep
         }
     }

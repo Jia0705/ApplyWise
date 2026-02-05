@@ -46,12 +46,12 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.team.applywise.data.model.ApplicationStatus
 import com.team.applywise.data.model.StatusChange
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.SnackbarHost
 import com.team.applywise.ui.components.NetworkStatusBanner
 import com.team.applywise.core.utils.Utils
 import com.team.applywise.core.utils.ConnectivityObserver
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.sp
 
 /**
  * TimelineScreen - Shows history of status changes for an application
@@ -92,14 +92,25 @@ fun TimelineScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            TopAppBar(
-                title = { Text("Timeline", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
+            // Custom header with back button and title
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onNavigateBack) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                 }
-            )
+                
+                Text(
+                    text = "Timeline",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            }
+            
             NetworkStatusBanner(isOffline = !isOnline)
             if (uiState.isLoading) {
             Box(

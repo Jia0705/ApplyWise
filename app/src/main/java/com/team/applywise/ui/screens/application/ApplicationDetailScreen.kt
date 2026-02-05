@@ -54,13 +54,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.SnackbarHost
 import com.team.applywise.ui.components.ApplicationStatusBadge
 import com.team.applywise.ui.components.NetworkStatusBanner
 import com.team.applywise.core.utils.Utils
 import com.team.applywise.core.utils.ConnectivityObserver
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.sp
 
 /**
  * ApplicationDetailScreen - Shows full details of one application
@@ -127,22 +127,34 @@ fun ApplicationDetailScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            TopAppBar(
-                title = { Text("Application Details", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { onNavigateToEdit(applicationId) }) {
-                        Icon(Icons.Default.Edit, contentDescription = "Edit")
-                    }
-                    IconButton(onClick = { showDeleteDialog = true }) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete")
-                    }
+            // Custom header with back, title, and action buttons
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onNavigateBack) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                 }
-            )
+                
+                Text(
+                    text = "Application Details",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp,
+                    modifier = Modifier
+                        .padding(start = 8.dp)
+                        .weight(1f)
+                )
+                
+                IconButton(onClick = { onNavigateToEdit(applicationId) }) {
+                    Icon(Icons.Default.Edit, contentDescription = "Edit")
+                }
+                IconButton(onClick = { showDeleteDialog = true }) {
+                    Icon(Icons.Default.Delete, contentDescription = "Delete")
+                }
+            }
+            
             NetworkStatusBanner(isOffline = !isOnline)
             if (uiState.isLoading) {
             Box(
